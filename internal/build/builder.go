@@ -11,7 +11,8 @@ import (
 	"strings"
 )
 
-func BuildWSL(dockerImage, outputDir string) {
+// BuildWSL builds a WSL distribution from a Docker image with specified verbosity
+func BuildWSL(dockerImage, outputDir string, verbose bool) string {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		logger.Error("Failed to create output directory: ", err)
 		os.Exit(1)
@@ -26,7 +27,12 @@ func BuildWSL(dockerImage, outputDir string) {
 	distroName := strings.Split(filepath.Base(dockerImage), ":")[0]
 	containerName := distroName
 
-	logger.Info("Starting build for ", distroName, " WSL distro")
+	if verbose {
+		logger.Info("Starting build for ", distroName, " WSL distro")
+	} else {
+		logger.Debug("Starting build for ", distroName, " WSL distro")
+	}
+
 	if err := docker.RunContainer(containerName, dockerImage); err != nil {
 		logger.Error("Failed to run container: ", err)
 		docker.CleanupContainer(containerName)
@@ -99,5 +105,11 @@ func BuildWSL(dockerImage, outputDir string) {
 		os.Exit(1)
 	}
 
-	logger.Info("WSL distro build completed successfully. Output file: ", wslPath)
+	if verbose {
+		logger.Info("WSL distro build completed successfully. Output file: ", wslPath)
+	} else {
+		logger.Debug("WSL distro build completed successfully. Output file: ", wslPath)
+	}
+
+	return wslPath
 }

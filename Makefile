@@ -1,11 +1,14 @@
 BINARY_NAME = wslb
+VERSION ?= 0.1.0
 
 LDFLAGS = -s -w
 
 ifeq ($(OS),Windows_NT)
     BIN_DIR = bin
+    LDFLAGS = -s -w -X github.com/wsl-images/wslb/internal/version.Version=$(VERSION)
 else
     BIN_DIR = ./bin
+    LDFLAGS = -s -w -X github.com/wsl-images/wslb/internal/version.Version=$(VERSION)
 endif
 
 .PHONY: all linux windows clean

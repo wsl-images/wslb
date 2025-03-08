@@ -1,11 +1,36 @@
 package logger
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
 )
+
+type CustomTextFormatter struct {
+	*logrus.TextFormatter
+}
+
+// Format overrides the TextFormatter Format method to skip level output
+func (f *CustomTextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	// Get the standard formatting
+	b, err := f.TextFormatter.Format(entry)
+	if err != nil {
+		return nil, err
+	}
+
+	// For INFO level logs, remove the "INFO" prefix
+	if entry.Level == logrus.InfoLevel {
+		// Find the start of the message by skipping "INFO" and space
+		parts := bytes.SplitN(b, []byte(" "), 2)
+		if len(parts) == 2 {
+			return parts[1], nil
+		}
+	}
+
+	return b, nil
+}
 
 var (
 	stdoutLog = logrus.New()
@@ -32,12 +57,17 @@ func init() {
 		stdoutLog.Fatal("Unable to open log file: ", err)
 	}
 
-	stdoutLog.SetOutput(os.Stdout)
-	stdoutLog.SetFormatter(&logrus.TextFormatter{
+	baseFormatter := &logrus.TextFormatter{
 		ForceColors:      true,
-		FullTimestamp:    true,
+		FullTimestamp:    false,
 		TimestampFormat:  "2006-01-02 15:04:05",
-		DisableTimestamp: false,
+		DisableTimestamp: true,
+	}
+
+	stdoutLog.SetOutput(os.Stdout)
+	stdoutLog.SetOutput(os.Stdout)
+	stdoutLog.SetFormatter(&CustomTextFormatter{
+		TextFormatter: baseFormatter,
 	})
 
 	fileLog.SetOutput(logFile)

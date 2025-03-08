@@ -6,7 +6,7 @@ import (
 )
 
 func RunContainer(containerName, image string) error {
-	logger.Info("Running container ", containerName, " for image ", image)
+	logger.Debug("Running container ", containerName, " for image ", image)
 	cmd := exec.Command("docker", "run", "-t", "--name", containerName, image, "ls", "/")
 	return cmd.Run()
 }

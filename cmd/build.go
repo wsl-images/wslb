@@ -13,7 +13,7 @@ var buildCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		dockerImage := args[0]
-		build.BuildWSL(dockerImage, outputDir)
+		build.BuildWSL(dockerImage, outputDir, true)
 	},
 }
 

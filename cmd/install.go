@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/wsl-images/wslb/internal/build"
-	"github.com/wsl-images/wslb/internal/install"
 	"github.com/wsl-images/wslb/internal/logger"
+	"github.com/wsl-images/wslb/internal/wsl"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,13 +39,14 @@ var installCmd = &cobra.Command{
 			}
 			imageURL := args[0]
 			tmpDir := "./tmp"
-			build.BuildWSL(imageURL, tmpDir)
+			logger.Info("Installing WSL distribution from ", imageURL)
+			build.BuildWSL(imageURL, tmpDir, false)
 			distroName := strings.Split(filepath.Base(imageURL), ":")[0]
 			wslFile = filepath.Join(tmpDir, distroName+".wsl")
 			tmpDirUsed = true
 		}
 
-		install.InstallWSL(wslFile, customName)
+		wsl.InstallDistribution(wslFile, customName)
 
 		if tmpDirUsed {
 			_ = os.RemoveAll("./tmp")

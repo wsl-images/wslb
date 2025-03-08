@@ -1,4 +1,4 @@
-package install
+package wsl
 
 import (
 	"github.com/wsl-images/wslb/internal/logger"
@@ -6,8 +6,7 @@ import (
 	"os/exec"
 )
 
-func InstallWSL(wslFile, customName string) {
-	logger.Info("Installing WSL distro...")
+func InstallDistribution(wslFile, customName string) {
 	installArgs := []string{"--install", "--from-file", wslFile}
 	if customName != "" {
 		installArgs = append(installArgs, "--name", customName)
@@ -19,5 +18,4 @@ func InstallWSL(wslFile, customName string) {
 		logger.Error("WSL install command failed: ", err)
 		os.Exit(1)
 	}
-	logger.Info("WSL distro installed successfully!")
 }

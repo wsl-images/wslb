@@ -7,6 +7,7 @@ WSLB is a command-line tool that simplifies building and installing Windows Subs
 - Build custom WSL distributions from any Docker image
 - Install WSL distributions directly from Docker image URLs
 - Install pre-built WSL distribution files
+- Manage WSL distributions (list, stop, remove)
 
 ## Installation
 
@@ -57,6 +58,61 @@ Options:
 - `-n, --name`: Specify a custom name for the WSL distribution
 - `-f, --file`: Path to a pre-built .wsl file
 
+### List WSL distributions
+
+```bash
+wslb ls
+# or
+wslb list
+```
+
+Options:
+- `--all`: List all distributions, including those being installed or uninstalled
+- `--running`: List only distributions that are currently running
+- `-q, --quiet`: Only show distribution names
+- `-v, --verbose`: Show detailed information about all distributions
+- `-o, --online`: Display a list of available distributions for install
+
+### Remove a WSL distribution
+
+```bash
+wslb rm <Distro>
+```
+
+Unregisters the distribution and deletes the root filesystem.
+
+### Stop a WSL distribution
+
+```bash
+wslb stop <Distro>
+```
+
+Terminates the specified WSL distribution.
+
+### Shutdown all WSL distributions
+
+```bash
+wslb shutdown
+```
+
+Immediately terminates all running distributions and the WSL 2 lightweight utility virtual machine.
+
+### Show WSL status
+
+```bash
+wslb status
+```
+
+Shows the status of Windows Subsystem for Linux.
+
+### Display version information
+
+```bash
+wslb version
+```
+
+Prints the version information of WSLB.
+
 ## Examples
 
 Build Ubuntu 22.04 and save to a specific directory:
@@ -69,6 +125,12 @@ Install Debian with a custom name:
 
 ```bash
 wslb install debian:bullseye -n MyDebianWSL
+```
+
+List all running WSL distributions:
+
+```bash
+wslb ls --running
 ```
 
 [//]: # (## Configuration)
