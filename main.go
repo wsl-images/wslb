@@ -13,38 +13,90 @@ import (
 )
 
 func main() {
-	// Define the build command with a flag for output directory using spf13/pflag.
-	buildCmd := pflag.NewFlagSet("build", pflag.ExitOnError)
-	outputDir := buildCmd.StringP("output", "o", ".", "Output directory for the WSL file")
-
-	// Check if a command is provided.
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: wsl-builder build [flags] docker-image")
+		usage()
 		os.Exit(1)
 	}
 
-	// Parse the command.
-	switch os.Args[1] {
+	cmd := os.Args[1]
+	switch cmd {
 	case "build":
-		// pflag supports interspersed flags, so they can appear before or after positional arguments.
+		// Build command: allow interspersed flags.
+		buildCmd := pflag.NewFlagSet("build", pflag.ExitOnError)
+		outputDir := buildCmd.StringP("output", "o", ".", "Output directory for the WSL file")
 		buildCmd.Parse(os.Args[2:])
 
-		// Get the Docker image name from the remaining arguments.
 		args := buildCmd.Args()
 		if len(args) < 1 {
 			fmt.Println("Error: Docker image path is required")
-			fmt.Println("Usage: wsl-builder build [flags] docker-image")
+			fmt.Println("Usage: wsl-builder build [-o output-dir] docker-image")
 			os.Exit(1)
 		}
-
 		dockerImage := args[0]
 		buildWSL(dockerImage, *outputDir)
 
+	case "install":
+		// Install command supports two optional flags: -n for name, -f for file.
+		installCmd := pflag.NewFlagSet("install", pflag.ExitOnError)
+		customName := installCmd.StringP("name", "n", "", "Custom name for installation")
+		fileFlag := installCmd.StringP("file", "f", "", "Path to a pre-built .wsl file")
+		installCmd.Parse(os.Args[2:])
+
+		var wslFile string
+		tmpDirUsed := false
+
+		// If -f is provided, use that file.
+		if *fileFlag != "" {
+			wslFile = *fileFlag
+		} else {
+			// Otherwise, expect an image URL as a positional argument.
+			args := installCmd.Args()
+			if len(args) < 1 {
+				fmt.Println("Error: Either a file must be provided with -f or an image URL must be specified.")
+				fmt.Println("Usage: wsl-builder install [-n customName] [-f file] [image URL]")
+				os.Exit(1)
+			}
+			imageURL := args[0]
+			// Use a temporary directory for the build.
+			tmpDir := "./tmp"
+			buildWSL(imageURL, tmpDir)
+			// The buildWSL function names the output file as "<distroName>.wsl"
+			distroName := strings.Split(filepath.Base(imageURL), ":")[0]
+			wslFile = filepath.Join(tmpDir, distroName+".wsl")
+			tmpDirUsed = true
+		}
+
+		// Build the wsl install command.
+		installArgs := []string{"--install", "--from-file", wslFile}
+		if *customName != "" {
+			installArgs = append(installArgs, "--name", *customName)
+		}
+		logStep("Installing WSL distro...")
+		installCmdExec := exec.Command("wsl", installArgs...)
+		installCmdExec.Stdout = os.Stdout
+		installCmdExec.Stderr = os.Stderr
+		if err := installCmdExec.Run(); err != nil {
+			logError(fmt.Sprintf("WSL install command failed: %v", err))
+			if tmpDirUsed {
+				os.RemoveAll("./tmp")
+			}
+			os.Exit(1)
+		}
+		logSuccess("WSL distro installed successfully!")
+		if tmpDirUsed {
+			os.RemoveAll("./tmp")
+		}
+
 	default:
-		fmt.Printf("Unknown command: %s\n", os.Args[1])
-		fmt.Println("Usage: wsl-builder build [flags] docker-image")
+		usage()
 		os.Exit(1)
 	}
+}
+
+func usage() {
+	fmt.Println("Usage:")
+	fmt.Println("  wsl-builder build [-o output-dir] docker-image")
+	fmt.Println("  wsl-builder install [-n customName] [-f file] [image URL]")
 }
 
 func buildWSL(dockerImage, outputDir string) {
@@ -54,7 +106,6 @@ func buildWSL(dockerImage, outputDir string) {
 		os.Exit(1)
 	}
 
-	// Convert outputDir to an absolute path.
 	absOutputDir, err := filepath.Abs(outputDir)
 	if err != nil {
 		logError(fmt.Sprintf("Failed to resolve absolute path for output directory: %v", err))
@@ -78,7 +129,6 @@ func buildWSL(dockerImage, outputDir string) {
 
 	// Step 2: Export container to a tarball while filtering out etc/resolv.conf.
 	logStep("Exporting container to tarball...")
-
 	tarPath := filepath.Join(absOutputDir, distroName+"-wsl.tar")
 	outFile, err := os.Create(tarPath)
 	if err != nil {
@@ -88,8 +138,6 @@ func buildWSL(dockerImage, outputDir string) {
 	}
 
 	tarWriter := tar.NewWriter(outFile)
-
-	// Execute "docker export" and get its stdout as a stream.
 	exportCmd := exec.Command("docker", "export", containerName)
 	stdout, err := exportCmd.StdoutPipe()
 	if err != nil {
@@ -105,8 +153,6 @@ func buildWSL(dockerImage, outputDir string) {
 	}
 
 	tarReader := tar.NewReader(stdout)
-
-	// Process the tar stream, writing all files except etc/resolv.conf.
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -118,7 +164,7 @@ func buildWSL(dockerImage, outputDir string) {
 			os.Exit(1)
 		}
 
-		// Skip any file that matches "etc/resolv.conf".
+		// Skip "etc/resolv.conf"
 		if header.Name == "etc/resolv.conf" {
 			continue
 		}
@@ -142,7 +188,6 @@ func buildWSL(dockerImage, outputDir string) {
 		os.Exit(1)
 	}
 
-	// Explicitly close the tar writer and output file to release file handles.
 	if err := tarWriter.Close(); err != nil {
 		logError(fmt.Sprintf("Error closing tar writer: %v", err))
 		cleanupContainer(containerName)
