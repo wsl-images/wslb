@@ -1,5 +1,4 @@
 {
-  "name": "wslb",
   "version": "0.0.4",
   "description": "WSLB – A tool for managing WSL binaries",
   "homepage": "https://github.com/wsl-images/wslb",
