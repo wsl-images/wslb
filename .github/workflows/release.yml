@@ -1,0 +1,56 @@
+name: Release Go Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Build for Windows and Linux
+        run: |
+          VERSION=${{ env.VERSION }}
+          # Build Windows binary
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb.exe .
+          
+          # Build Linux binary
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: WSLB v${{ env.VERSION }}
+          files: |
+            ./bin/wslb.exe
+            ./bin/wslb
+          generate_release_notes: true
+          body: |
+            ## WSLB v${{ env.VERSION }}
+
+            ### Installation
+            
+            Instll with Go:
+            ```
+            go install github.com/wsl-images/wslb@v${{ env.VERSION }}
+            ```
+            
+            Or download the binary directly from the assets below.
