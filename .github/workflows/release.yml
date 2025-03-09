@@ -38,46 +38,15 @@ jobs:
           echo "Extracted version: $version"
         shell: bash
 
-      - name: Build all components
-        run: |
-          # Run your PowerShell build script using pwsh (PowerShell Core is available on Ubuntu)
-          pwsh ./build.ps1 -Version "${{ env.VERSION }}"
-        shell: bash
-
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.8.1
         with:
           cosign-release: 'v2.4.3'
 
-      - name: Sign wslb.exe with Cosign (keyless)
+      - name: Build all components
         run: |
-          # This step signs the binary using keyless signing via GitHub OIDC.
-          cosign sign-blob bin/wslb.exe \
-            --output-signature bin/wslb.exe.sig \
-            --output-certificate bin/wslb.exe.pem \
-            --yes
-        shell: bash
-
-      - name: Verify Cosign signature
-        run: |
-          # Verify that the signature is valid.
-          cosign verify-blob bin/wslb.exe \
-            --signature bin/wslb.exe.sig \
-            --certificate bin/wslb.exe.pem \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-        shell: bash
-
-      - name: Calculate wslb.exe hash
-        run: |
-          exePath="bin/wslb.exe"
-          if [ -f "$exePath" ]; then
-            hash=$(sha256sum "$exePath" | cut -d ' ' -f1)
-            echo "$hash" > bin/wslb-exe-hash.txt
-            echo "Calculated wslb.exe SHA256: $hash"
-          else
-            echo "Error: wslb.exe not found!"
-            exit 1
-          fi
+          # Run your PowerShell build script using pwsh (PowerShell Core is available on Ubuntu)
+          pwsh ./build.ps1 -Version "${{ env.VERSION }}"
         shell: bash
 
       - name: Create GitHub Release
