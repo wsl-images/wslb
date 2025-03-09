@@ -82,14 +82,6 @@ jobs:
           echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
-      - name: Create ZIP Package
-        run: |
-          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
-
-      - name: Create Linux TAR Package
-        run: |
-          tar -czvf "wslb_${VERSION}_linux_amd64.tar.gz" wslb    
-
       - name: Update Scoop Manifest (wslb.json)
         run: |
           jq ".version = \"${VERSION}\" |
@@ -99,6 +91,14 @@ jobs:
           cat wslb.json
           git add wslb.json
           git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
+
+      - name: Create ZIP Package
+        run: |
+          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
+
+      - name: Create Linux TAR Package
+        run: |
+          tar -czvf "wslb_${VERSION}_linux_amd64.tar.gz" wslb        
 
       - name: Create Git Tag
         run: |
