@@ -50,12 +50,6 @@ jobs:
             exit 1
           fi
 
-      - name: Update go.mod Version
-        run: |
-          sed -i 's/go 1.24/go 1.21/' go.mod
-          git add go.mod
-          git commit -m "chore: fix go version in go.mod" || echo "No changes to go.mod needed"
-
       - name: Update Scoop Manifest (wslb.json)
         run: |
           jq ".version = \"${VERSION}\" | 
