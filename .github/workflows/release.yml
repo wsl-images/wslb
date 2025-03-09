@@ -34,12 +34,6 @@ jobs:
           # Build Linux binary
           GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb .
 
-      - name: Calculate hashes
-        run: |
-          mkdir -p ./bin
-          sha256sum ./bin/wslb.exe > ./bin/wslb-windows.sha256
-          sha256sum ./bin/wslb > ./bin/wslb-linux.sha256
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -47,17 +41,20 @@ jobs:
           files: |
             ./bin/wslb.exe
             ./bin/wslb
-            ./bin/wslb-windows.sha256
-            ./bin/wslb-linux.sha256
           generate_release_notes: true
           body: |
             ## WSLB v${{ env.VERSION }}
 
             ### Installation
             
-            Install with Go:
+            Install specific version:
             ```
             go install github.com/wsl-images/wslb@v${{ env.VERSION }}
+            ```
+            
+            Install latest version:
+            ```
+            go install github.com/wsl-images/wslb@latest
             ```
             
             Or download the binary directly from the assets below.

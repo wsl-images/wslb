@@ -17,12 +17,18 @@ WSLB is a command-line tool that simplifies building and installing Windows Subs
 - Docker installed and running
 - Go 1.16 or later (for building from source)
 
+
+### Install With Go
+```bash
+go install github.com/wsl-images/wslb@latest
+```
+
 ### Building from source
 
 ```bash
 git clone https://github.com/wsl-images/wslb.git
 cd wslb
-make windows
+.\build.ps1
 ```
 
 The executable will be available in the `bin` directory.
