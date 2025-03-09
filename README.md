@@ -25,7 +25,8 @@ go install -a github.com/wsl-images/wslb@latest
 
 ### Install With Scoop
 ```bash
-scoop install https://raw.githubusercontent.com/wsl-images/wslb/master/wslb.json
+scoop bucket add wsl-images-bucket https://github.com/wsl-images/wsl-images-bucket
+scoop install wsl-images-bucket/wslb 
 ```
 
 ### Antivirus and Anti Malware Problems with Scoop

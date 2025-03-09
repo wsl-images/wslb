@@ -71,6 +71,10 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
 
+      - name: Build Release Binary (Linux)
+        run: |
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb .
+
       - name: Compute SHA256 of wslb.exe
         id: compute_hash
         run: |
@@ -78,9 +82,20 @@ jobs:
           echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
+      - name: Compute SHA256 of Linux Binary
+        id: compute_linux_hash
+        run: |
+          HASH=$(sha256sum wslb | awk '{print $1}')
+          echo "sha256=$HASH" >> $GITHUB_OUTPUT
+          echo "Computed Linux SHA256: $HASH"    
+
       - name: Create ZIP Package
         run: |
           zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
+
+      - name: Create Linux TAR Package
+        run: |
+          tar -czvf "wslb_${VERSION}_linux_amd64.tar.gz" wslb    
 
       - name: Update Scoop Manifest (wslb.json)
         run: |
@@ -108,6 +123,8 @@ jobs:
           files: |
             wslb.exe
             wslb_${{ env.VERSION }}_windows_amd64.zip
+            wslb
+            wslb_${{ env.VERSION }}_linux_amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
