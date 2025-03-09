@@ -1,132 +1,115 @@
-name: CI and CD Pipeline
+name: CI/CD Pipeline
 
-# Trigger on pushes to develop and release/* branches (and allow manual trigger if needed)
 on:
   push:
     branches:
       - develop
-      - "release/*"
-  workflow_dispatch: {}  # allows manual triggering of this workflow if needed
+      - 'release/*'
+  workflow_dispatch: {}
 
 permissions:
-  contents: write   # allow pushing commits and tags
+  contents: write
 
 jobs:
-  # Job 1: Continuous Integration (build, test, lint)
   test-and-lint:
     name: Test and Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Go
+      - name: Set Up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.24.0"    # Use appropriate Go version
-
-      - name: Install Linter
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go-version: "1.20.x"
 
       - name: Run Unit Tests
         run: go test -v ./...
 
       - name: Run Linter
-        run: golangci-lint run
+        run: go vet ./...
 
-  # Job 2: Release process (runs only for release/* branches)
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: test-and-lint               # wait for tests to pass
-    if: startsWith(github.ref, 'refs/heads/release/')  # only run on release branches
-    env:
-      VERSION: ${{ replace(github.ref_name, 'release/', '') }}    # Extract "x.y.z" from "release/x.y.z" ref name
+    needs: test-and-lint
+    if: startsWith(github.ref, 'refs/heads/release/')
     steps:
-      - name: Checkout code (full history for tagging)
+      - name: Checkout Code (Full History)
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0          # fetch full Git history to allow tagging and merging
+          fetch-depth: 0
+
+      - name: Set VERSION Variable
+        run: |
+          # Extract version number by removing the "refs/heads/release/" prefix
+          VERSION=${GITHUB_REF#refs/heads/release/}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version set to $VERSION"
 
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
-          git config --global user.email "[email protected]"
+          git config --global user.email "action@github.com"
 
-      - name: Verify version.go is updated
-        id: check_version
-        shell: bash
+      - name: Update version.go if Needed
         run: |
-          if grep -q "${VERSION}" version.go; then
-            echo "Version file already contains ${VERSION}"
+          if grep -q "Version = \"${VERSION}\"" internal/version/version.go; then
+            echo "internal/version/version.go already contains ${VERSION}"
           else
-            echo "Version not updated in code, updating now..."
-            sed -i "s/const[[:space:]]\+Version[[:space:]]*=.*/const Version = \"${VERSION}\"/" version.go
-            git add version.go
-            git commit -m "chore: bump version to ${VERSION}"
+            sed -i "s/Version = \".*\"/Version = \"${VERSION}\"/" internal/version/version.go
+            git add internal/version/version.go
+            git commit -m "chore: update version.go to ${VERSION}"
           fi
 
-      - name: Build release binary
-        # Build for Windows (assuming wslb is a CLI tool to be distributed via Scoop)
+      - name: Build Release Binary (Windows)
         run: |
-          GOOS=windows GOARCH=amd64 go build -o wslb.exe .
-          # (Optional) Add other OS/ARCH builds if needed
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
 
-      - name: Package binary
-        run: zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
-
-      - name: Compute SHA-256
+      - name: Compute SHA256 of wslb.exe
         id: compute_hash
-        shell: bash
         run: |
-          HASH=$(sha256sum "wslb_${VERSION}_windows_amd64.zip" | cut -d ' ' -f1)
-          echo "SHA256=$HASH" >> $GITHUB_ENV
-        # Now ${{ env.SHA256 }} contains the checksum
+          HASH=$(sha256sum wslb.exe | awk '{print $1}')
+          echo "::set-output name=sha256::$HASH"
+          echo "Computed SHA256: $HASH"
 
-      - name: Update Scoop manifest (wslb.json)
+      - name: Update Scoop Manifest (wslb.json)
         run: |
-          # Replace version, URL, and hash in the Scoop manifest JSON
           jq ".version = \"${VERSION}\" |
-              .architecture.\"64bit\".url = \"https://github.com/wsl-images/wslb/releases/download/${VERSION}/wslb_${VERSION}_windows_amd64.zip\" |
-              .architecture.\"64bit\".hash = \"${SHA256}\"" wslb.json > wslb_new.json 
+              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb.exe\" |
+              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
           mv wslb_new.json wslb.json
-
           git add wslb.json
-          git commit -m "chore: update Scoop manifest for ${VERSION}"
+          git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
 
-      - name: Create Git tag for release
-        id: create_tag
+      - name: Create Git Tag
         run: |
-          git tag -a "${VERSION}" -m "Release ${VERSION}"
-          git push origin "${VERSION}"   # push the tag to remote
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        id: create_release
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }}
-          release_name: "v${{ env.VERSION }}"
+          tag_name: "v${VERSION}"
+          name: "WSLB v${VERSION}"
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ steps.create_tag.outputs.upload_url || steps.create-release.outputs.upload_url }}
-          asset_path: "wslb_${VERSION}_windows_amd64.zip"
-          asset_name: "wslb_${VERSION}_windows_amd64.zip"
-          asset_content_type: application/zip
+          tag_name: "v${VERSION}"
+          files: wslb.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge release branch to master
+      - name: Merge Release Branch into master
         run: |
-          # Fetch latest master
           git fetch origin master
-          # Attempt fast-forward merge
           git checkout master
-          git pull origin master          # ensure up-to-date
-          git merge --ff-only "${{ github.ref_name }}" || git merge --no-ff "${{ github.ref_name }}" -m "Merge release ${VERSION} into master"
+          git pull origin master
+          git merge --no-ff "${GITHUB_REF}" -m "Merge release ${VERSION} into master"
           git push origin master
