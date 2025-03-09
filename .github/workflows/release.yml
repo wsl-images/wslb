@@ -30,10 +30,10 @@ jobs:
         run: |
           VERSION=${{ env.VERSION }}
           # Build Windows binary
-          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb.exe .
+          GOOS=windows GOARCH=amd64 go build -o ./bin/wslb.exe .
           
           # Build Linux binary
-          GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb .
+          GOOS=linux GOARCH=amd64 go build -o ./bin/wslb .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
