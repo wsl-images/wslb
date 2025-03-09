@@ -112,3 +112,11 @@ jobs:
           git pull origin master
           git merge --no-ff "${GITHUB_REF}" -m "Merge release ${VERSION} into master"
           git push origin master
+
+      - name: Merge master back into develop
+        run: |
+          git fetch origin develop
+          git checkout develop
+          git pull origin develop
+          git merge --no-ff master -m "Merge master into develop after release ${VERSION}"
+          git push origin develop
