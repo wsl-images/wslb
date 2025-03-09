@@ -48,14 +48,9 @@ jobs:
 
             ### Installation
             
-            Install specific version:
+            Instll with Go:
             ```
             go install github.com/wsl-images/wslb@v${{ env.VERSION }}
-            ```
-            
-            Install latest version:
-            ```
-            go install -a github.com/wsl-images/wslb@latest
             ```
             
             Or download the binary directly from the assets below.
