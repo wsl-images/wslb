@@ -1,73 +1,64 @@
-name: Create Release
+name: Release Go Binary
 
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
-  build_and_release:
-    # Using Ubuntu so we can use the Cosign installer action and standard Bash utilities.
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Go
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Extract version from tag
         id: get_version
-        run: |
-          # Extract version from tag name (removing a leading "v" if present)
-          version="${GITHUB_REF##*/}"
-          version="${version#v}"
-          echo "VERSION=$version" >> $GITHUB_ENV
-          echo "VERSION=$version" >> $GITHUB_OUTPUT
-          echo "Extracted version: $version"
-        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.8.1
-        with:
-          cosign-release: 'v2.4.3'
-
-      - name: Build all components
+      - name: Build for Windows and Linux
         run: |
-          # Run your PowerShell build script using pwsh (PowerShell Core is available on Ubuntu)
-          pwsh ./build.ps1 -Version "${{ env.VERSION }}"
-        shell: bash
+          # Build Windows binary
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb.exe .
+          
+          # Build Linux binary
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb .
+
+      - name: Calculate hashes
+        run: |
+          mkdir -p ./bin
+          sha256sum ./bin/wslb.exe > ./bin/wslb-windows.sha256
+          sha256sum ./bin/wslb > ./bin/wslb-linux.sha256
 
       - name: Create GitHub Release
-        id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          name: WSLB ${{ env.VERSION }}
-          draft: false
-          prerelease: false
+          name: WSLB v${{ env.VERSION }}
           files: |
-            bin/wslb.exe
-            bin/wslb
-            bin/wslb-exe-hash.txt
-            bin/wslb.exe.sig
-            bin/wslb.exe.pem
+            ./bin/wslb.exe
+            ./bin/wslb
+            ./bin/wslb-windows.sha256
+            ./bin/wslb-linux.sha256
           generate_release_notes: true
+          body: |
+            ## WSLB v${{ env.VERSION }}
 
-      - name: Output Hash for WinGet
-        run: |
-          exeHash=$(cat bin/wslb-exe-hash.txt)
-          echo "wslb.exe SHA256: $exeHash"
-          echo "Use this hash in your WinGet manifest"
-        shell: bash
+            ### Installation
+            
+            Install with Go:
+            ```
+            go install github.com/wsl-images/wslb@v${{ env.VERSION }}
+            ```
+            
+            Or download the binary directly from the assets below.
+
