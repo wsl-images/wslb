@@ -71,9 +71,9 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
 
-      - name: Build Release Binary (Linux)
+      - name: Create ZIP Package
         run: |
-          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb .
+          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe    
 
       - name: Compute SHA256 of ZIP package
         id: compute_hash
@@ -92,9 +92,9 @@ jobs:
           git add wslb.json
           git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
 
-      - name: Create ZIP Package
+      - name: Build Release Binary (Linux)
         run: |
-          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb .
 
       - name: Create Linux TAR Package
         run: |
