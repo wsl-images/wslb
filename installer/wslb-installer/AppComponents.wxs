@@ -1,0 +1,28 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+	<Package Name="WSLB" Version='$(env.VERSION)' Manufacturer="WSL-Images"
+			 UpgradeCode="89197a8e-b3ff-4d31-822a-5695502035ed"
+			 Language="1033" Codepage="1252"
+			 InstallerVersion="500" Compressed="yes" Scope="perUser">
+		<SummaryInformation Manufacturer="WSL-Images" Keywords="Installer,MSI,Package" />
+		<MajorUpgrade DowngradeErrorMessage="A newer version of wslb is already installed." />
+		<MediaTemplate EmbedCab="yes" />
+
+		<StandardDirectory Id="LocalAppDataFolder">
+			<Directory Id="INSTALLDIR" Name="WSLB">
+				<Component Id="MainExecutableComponent" Guid="31345b3c-b3c5-4062-8573-691d15654871">
+					<File Id="wslb_exe" Source="..\..\bin\wslb.exe" />
+					<Environment Id="PathVar" Name="PATH" Value="[INSTALLDIR]"
+									Action="set" Part="last" Permanent="no" System="no" />
+					<RemoveFolder Id="RemoveWslbDir" Directory="INSTALLDIR" On="uninstall" />
+					<RegistryValue Root="HKCU" Key="Software\WSL-Images\wslb" Name="Installed" Type="integer" Value="1" KeyPath="yes"/>
+				</Component>
+			</Directory>
+		</StandardDirectory>
+
+		<Feature Id="MainFeature" Title="WSLB Application" Level="1">
+			<ComponentRef Id="MainExecutableComponent" />
+		</Feature>
+	</Package>
+</Wix>
+
+

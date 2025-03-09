@@ -1,0 +1,63 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build_and_release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          $version = "${{ github.ref_name }}".Replace('v', '')
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build all components
+        run: make all
+
+      - name: Calculate MSI hash
+        id: calculate_hash
+        run: |
+          $hash = (Get-FileHash -Path bin\wslb-installer.msi -Algorithm SHA256).Hash
+          echo "MSI_HASH=$hash" >> $env:GITHUB_OUTPUT
+          echo "MSI Installer SHA256: $hash" > bin\installer-hash.txt
+        shell: pwsh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: WSLB ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            bin/wslb.exe
+            bin/wslb
+            bin/wslb-installer.msi
+            bin/installer-hash.txt
+          generate_release_notes: true
+
+      - name: Output Hash for WinGet
+        run: |
+          echo "MSI Installer SHA256: ${{ steps.calculate_hash.outputs.MSI_HASH }}"
+          echo "Use this hash in your WinGet manifest"
