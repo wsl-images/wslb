@@ -38,6 +38,19 @@ jobs:
           .\build.ps1 -Version "${{ env.VERSION }}"
         shell: pwsh
 
+      - name: Calculate wslb.exe hash
+        run: |
+          $exePath = "bin\wslb.exe"
+          if (Test-Path $exePath) {
+            $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
+            $hash | Out-File "bin\wslb-exe-hash.txt"
+            echo "Calculated wslb.exe SHA256: $hash"
+          } else {
+            echo "Error: wslb.exe not found!"
+            exit 1
+          }
+        shell: pwsh
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -47,13 +60,12 @@ jobs:
           files: |
             bin/wslb.exe
             bin/wslb
-            bin/wslb-installer.msi
-            bin/installer-hash.txt
+            bin/wslb-exe-hash.txt
           generate_release_notes: true
 
       - name: Output Hash for WinGet
         run: |
-          $hash = Get-Content bin\installer-hash.txt
-          echo "MSI Installer SHA256: $hash"
+          $exeHash = Get-Content bin\wslb-exe-hash.txt
+          echo "wslb.exe SHA256: $exeHash"
           echo "Use this hash in your WinGet manifest"
         shell: pwsh

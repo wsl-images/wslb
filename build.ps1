@@ -25,15 +25,4 @@ Remove-Item env:GOARCH
 Write-Host "Building WSLB Windows binary..."
 go build -ldflags $LdFlags -o "$BinDir\$BinaryName.exe" .
 
-Write-Host "Creating Windows installer..."
-$CleanVersion = $Version.Replace(' ', '')
-dotnet build installer/wslb-installer/wslb-installer.wixproj -p:Version=$CleanVersion -c Release -o $BinDir
-
-$MsiPath = "$BinDir\wslb-installer.msi"
-if (Test-Path $MsiPath) {
-    $Hash = (Get-FileHash -Path $MsiPath -Algorithm SHA256).Hash
-    Write-Host "MSI Installer SHA256: $Hash"
-    $Hash | Out-File "$BinDir\installer-hash.txt"
-}
-
 Write-Host "Build completed successfully!"
