@@ -1,10 +1,10 @@
 {
   "name": "wslb",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "WSLB – A tool for managing WSL binaries",
   "homepage": "https://github.com/wsl-images/wslb",
   "license": "MIT",
-  "url": "https://github.com/wsl-images/wslb/releases/download/v0.0.2/wslb.exe",
+  "url": "https://github.com/wsl-images/wslb/releases/download/v0.0.3/wslb.exe",
   "hash": "sha256:83a08cea2d50ee066bc077d92e3148878413e33dda9ebe27fc23111eb16678c9",
   "architecture": {
     "64bit": {
