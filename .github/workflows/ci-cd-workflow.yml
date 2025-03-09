@@ -74,7 +74,7 @@ jobs:
         id: compute_hash
         run: |
           HASH=$(sha256sum wslb.exe | awk '{print $1}')
-          echo "::set-output name=sha256::$HASH"
+          echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
       - name: Update Scoop Manifest (wslb.json)
@@ -91,7 +91,7 @@ jobs:
           git tag -a "v${VERSION}" -m "Release v${VERSION}"
           git push origin "v${VERSION}"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with Assets
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
@@ -99,24 +99,9 @@ jobs:
           name: "WSLB v${{ env.VERSION }}"
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Executable Release Asset
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v${{ env.VERSION }}"
-          files: wslb.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload ZIP Release Asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: "wslb_${{ env.VERSION }}_windows_amd64.zip"
-          asset_name: "wslb_${{ env.VERSION }}_windows_amd64.zip"
-          asset_content_type: application/zip
+          files: |
+            wslb.exe
+            wslb_${{ env.VERSION }}_windows_amd64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
