@@ -55,7 +55,7 @@ jobs:
             
             Install latest version:
             ```
-            go install github.com/wsl-images/wslb@latest
+            go install -a github.com/wsl-images/wslb@latest
             ```
             
             Or download the binary directly from the assets below.
