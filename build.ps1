@@ -4,7 +4,7 @@ param (
 
 $BinaryName = "wslb"
 $BinDir = "bin"
-$LdFlags = "-s -w -X github.com/wsl-images/wslb/internal/version.Version=$Version"
+$LdFlags = "-X github.com/wsl-images/wslb/internal/version.Version=$Version"
 
 
 if (-not (Test-Path $BinDir)) {

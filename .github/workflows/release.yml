@@ -7,9 +7,11 @@ on:
 
 jobs:
   build_and_release:
-    runs-on: windows-latest
+    # Using Ubuntu so we can use the Cosign installer action and standard Bash utilities.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -28,32 +30,61 @@ jobs:
       - name: Extract version from tag
         id: get_version
         run: |
-          $version = "${{ github.ref_name }}".Replace('v', '')
-          echo "VERSION=$version" >> $env:GITHUB_ENV
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-        shell: pwsh
+          # Extract version from tag name (removing a leading "v" if present)
+          version="${GITHUB_REF##*/}"
+          version="${version#v}"
+          echo "VERSION=$version" >> $GITHUB_ENV
+          echo "VERSION=$version" >> $GITHUB_OUTPUT
+          echo "Extracted version: $version"
+        shell: bash
 
       - name: Build all components
         run: |
-          .\build.ps1 -Version "${{ env.VERSION }}"
-        shell: pwsh
+          # Run your PowerShell build script using pwsh (PowerShell Core is available on Ubuntu)
+          pwsh ./build.ps1 -Version "${{ env.VERSION }}"
+        shell: bash
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.1
+        with:
+          cosign-release: 'v2.4.3'
+
+      - name: Sign wslb.exe with Cosign (keyless)
+        run: |
+          # This step signs the binary using keyless signing via GitHub OIDC.
+          cosign sign-blob bin/wslb.exe \
+            --output-signature bin/wslb.exe.sig \
+            --output-certificate bin/wslb.exe.pem \
+            --yes
+        shell: bash
+
+      - name: Verify Cosign signature
+        run: |
+          # Verify that the signature is valid.
+          cosign verify-blob bin/wslb.exe \
+            --signature bin/wslb.exe.sig \
+            --certificate bin/wslb.exe.pem \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+        shell: bash
 
       - name: Calculate wslb.exe hash
         run: |
-          $exePath = "bin\wslb.exe"
-          if (Test-Path $exePath) {
-            $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
-            $hash | Out-File "bin\wslb-exe-hash.txt"
+          exePath="bin/wslb.exe"
+          if [ -f "$exePath" ]; then
+            hash=$(sha256sum "$exePath" | cut -d ' ' -f1)
+            echo "$hash" > bin/wslb-exe-hash.txt
             echo "Calculated wslb.exe SHA256: $hash"
-          } else {
+          else
             echo "Error: wslb.exe not found!"
             exit 1
-          }
-        shell: pwsh
+          fi
+        shell: bash
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref }}
           name: WSLB ${{ env.VERSION }}
           draft: false
           prerelease: false
@@ -61,11 +92,13 @@ jobs:
             bin/wslb.exe
             bin/wslb
             bin/wslb-exe-hash.txt
+            bin/wslb.exe.sig
+            bin/wslb.exe.pem
           generate_release_notes: true
 
       - name: Output Hash for WinGet
         run: |
-          $exeHash = Get-Content bin\wslb-exe-hash.txt
+          exeHash=$(cat bin/wslb-exe-hash.txt)
           echo "wslb.exe SHA256: $exeHash"
           echo "Use this hash in your WinGet manifest"
-        shell: pwsh
+        shell: bash
