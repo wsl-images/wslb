@@ -39,9 +39,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: WSLB v${{ env.VERSION }}
-          files: |
-            ./bin/wslb.exe
-            ./bin/wslb
           generate_release_notes: true
           body: |
             ## WSLB v${{ env.VERSION }}
