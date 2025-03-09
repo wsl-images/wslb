@@ -42,7 +42,7 @@ jobs:
 
       - name: Set VERSION Variable
         run: |
-          # Extract version number by removing the "refs/heads/release/" prefix
+          # Extract version by stripping "refs/heads/release/" prefix
           VERSION=${GITHUB_REF#refs/heads/release/}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Version set to $VERSION"
@@ -66,11 +66,15 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
 
+      - name: Create ZIP Package
+        run: |
+          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
+
       - name: Compute SHA256 of wslb.exe
         id: compute_hash
         run: |
           HASH=$(sha256sum wslb.exe | awk '{print $1}')
-          echo "::set-output name=sha256::$HASH"
+          echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
       - name: Update Scoop Manifest (wslb.json)
@@ -87,22 +91,17 @@ jobs:
           git tag -a "v${VERSION}" -m "Release v${VERSION}"
           git push origin "v${VERSION}"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with Assets
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${VERSION}"
-          name: "WSLB v${VERSION}"
+          tag_name: "v${{ env.VERSION }}"
+          name: "WSLB v${{ env.VERSION }}"
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v${VERSION}"
-          files: wslb.exe
+          files: |
+            wslb.exe
+            wslb_${{ env.VERSION }}_windows_amd64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
