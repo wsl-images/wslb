@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (without v prefix)'
+        required: true
+        type: string
 
 jobs:
   release:
@@ -22,11 +28,16 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Extract version from tag
+      - name: Extract version from tag or input
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          fi
 
-      # Update version.go file with the correct version from tag
+      # Update version.go file with the correct version
       - name: Update version.go file
         run: |
           sed -i "s/Version = \".*\"/Version = \"${{ env.VERSION }}\"/" internal/version/version.go
@@ -74,6 +85,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ env.VERSION }}
           name: WSLB v${{ env.VERSION }}
           files: |
             ./bin/wslb.exe
