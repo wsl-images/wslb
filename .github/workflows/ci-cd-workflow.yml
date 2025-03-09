@@ -75,10 +75,10 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb .
 
-      - name: Compute SHA256 of wslb.exe
+      - name: Compute SHA256 of ZIP package
         id: compute_hash
         run: |
-          HASH=$(sha256sum wslb.exe | awk '{print $1}')
+          HASH=$(sha256sum "wslb_${VERSION}_windows_amd64.zip" | awk '{print $1}')
           echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
@@ -93,8 +93,9 @@ jobs:
       - name: Update Scoop Manifest (wslb.json)
         run: |
           jq ".version = \"${VERSION}\" |
-              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb.exe\" |
-              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
+              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb_${VERSION}_windows_amd64.zip\" |
+              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\" |
+              .extract_dir = \"wslb_${VERSION}\"" wslb.json > wslb_new.json
           mv wslb_new.json wslb.json
           cat wslb.json
           git add wslb.json
