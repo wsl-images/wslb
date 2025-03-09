@@ -28,7 +28,7 @@ go install -a github.com/wsl-images/wslb@latest
 ```bash
 git clone https://github.com/wsl-images/wslb.git
 cd wslb
-.\build.ps1
+./build.sh
 ```
 
 The executable will be available in the `bin` directory.
