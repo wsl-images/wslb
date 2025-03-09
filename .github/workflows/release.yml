@@ -34,14 +34,8 @@ jobs:
         shell: pwsh
 
       - name: Build all components
-        run: make all
-
-      - name: Calculate MSI hash
-        id: calculate_hash
         run: |
-          $hash = (Get-FileHash -Path bin\wslb-installer.msi -Algorithm SHA256).Hash
-          echo "MSI_HASH=$hash" >> $env:GITHUB_OUTPUT
-          echo "MSI Installer SHA256: $hash" > bin\installer-hash.txt
+          .\build.ps1 -Version "${{ env.VERSION }}"
         shell: pwsh
 
       - name: Create GitHub Release
@@ -59,5 +53,7 @@ jobs:
 
       - name: Output Hash for WinGet
         run: |
-          echo "MSI Installer SHA256: ${{ steps.calculate_hash.outputs.MSI_HASH }}"
+          $hash = Get-Content bin\installer-hash.txt
+          echo "MSI Installer SHA256: $hash"
           echo "Use this hash in your WinGet manifest"
+        shell: pwsh
