@@ -26,13 +26,11 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
-      - name: Build for Windows and Linux
-        run: |
-          # Build Windows binary
-          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb.exe .
-          
-          # Build Linux binary
-          GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/wsl-images/wslb/internal/version.Version=$VERSION" -o ./bin/wslb .
+      - name: Make build script executable
+        run: chmod +x ./build.sh
+
+      - name: Build binaries using build script
+        run: ./build.sh $VERSION
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -46,16 +44,16 @@ jobs:
             ## WSLB v${{ env.VERSION }}
 
             ### Installation
-            
+
             Install specific version:
             ```
             go install github.com/wsl-images/wslb@v${{ env.VERSION }}
             ```
-            
+
             Install latest version:
             ```
             go install github.com/wsl-images/wslb@latest
             ```
-            
+
             Or download the binary directly from the assets below.
 
