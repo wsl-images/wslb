@@ -26,6 +26,12 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
+      # Update version.go file with the correct version from tag
+      - name: Update version.go file
+        run: |
+          sed -i "s/Version = \".*\"/Version = \"${{ env.VERSION }}\"/" internal/version/version.go
+          cat internal/version/version.go
+
       - name: Build for Windows and Linux
         run: |
           VERSION=${{ env.VERSION }}
@@ -95,6 +101,10 @@ jobs:
         with:
           ref: main
 
+      - name: Update version.go file on main
+        run: |
+          sed -i "s/Version = \".*\"/Version = \"${{ env.VERSION }}\"/" internal/version/version.go
+
       - name: Update wslb-package.json on main
         run: |
           cat <<EOF > wslb-package.json
@@ -113,10 +123,10 @@ jobs:
           }
           EOF
 
-      - name: Commit and push updated wslb-package.json
+      - name: Commit and push updated files to main
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add wslb-package.json
-          git commit -m "Update wslb-package.json for release v${{ env.VERSION }}"
+          git add wslb-package.json internal/version/version.go
+          git commit -m "Update version to v${{ env.VERSION }}"
           git push origin main

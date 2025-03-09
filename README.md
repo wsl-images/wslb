@@ -23,6 +23,11 @@ WSLB is a command-line tool that simplifies building and installing Windows Subs
 go install -a github.com/wsl-images/wslb@latest
 ```
 
+### Install With Scoop
+```bash
+scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
+```
+
 ### Building from source
 
 ```bash
