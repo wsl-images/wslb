@@ -28,6 +28,16 @@ go install -a github.com/wsl-images/wslb@latest
 scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
 ```
 
+### Antivirus and Anti Malware Problems with Scoop
+```bash
+Add-MpPreference -ExclusionPath "$($env:programdata)\scoop", "$($env:scoop)"
+```
+
+To Undo this change
+```bash
+Remove-MpPreference -ExclusionPath "$($env:programdata)\scoop", "$($env:scoop)"
+```
+
 ### Building from source
 
 ```bash

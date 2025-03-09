@@ -50,6 +50,7 @@ jobs:
           # Create version-specific package file for this release
           cat <<EOF > ./bin/wslb-package-v${{ env.VERSION }}.json
           {
+            "name": "wslb",
             "version": "${{ env.VERSION }}",
             "description": "WSLB – A tool for managing WSL binaries",
             "homepage": "https://github.com/wsl-images/wslb",
@@ -60,6 +61,12 @@ jobs:
               "64bit": {
                 "bin": ["wslb.exe"]
               }
+            },
+            "autoupdate": {
+              "url": "https://github.com/wsl-images/wslb/releases/download/v\$version/wslb.exe"
+            },
+            "checkver": {
+              "github": "https://github.com/wsl-images/wslb"
             }
           }
           EOF
@@ -109,6 +116,7 @@ jobs:
         run: |
           cat <<EOF > wslb-package.json
           {
+            "name": "wslb",
             "version": "${{ env.VERSION }}",
             "description": "WSLB – A tool for managing WSL binaries",
             "homepage": "https://github.com/wsl-images/wslb",
@@ -119,6 +127,12 @@ jobs:
               "64bit": {
                 "bin": ["wslb.exe"]
               }
+            },
+            "autoupdate": {
+              "url": "https://github.com/wsl-images/wslb/releases/download/v\$version/wslb.exe"
+            },
+            "checkver": {
+              "github": "https://github.com/wsl-images/wslb"
             }
           }
           EOF
