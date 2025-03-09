@@ -31,23 +31,63 @@ jobs:
           VERSION=${{ env.VERSION }}
           # Build Windows binary
           GOOS=windows GOARCH=amd64 go build -o ./bin/wslb.exe .
-          
+
           # Build Linux binary
           GOOS=linux GOARCH=amd64 go build -o ./bin/wslb .
+
+      - name: Calculate SHA256 hash
+        run: |
+          HASH=$(sha256sum ./bin/wslb.exe | awk '{print $1}')
+          echo "HASH=$HASH" >> $GITHUB_ENV
+
+      - name: Update wslb-package.json
+        run: |
+          # Update version, URL, hash, and fix architecture format
+          cat <<EOF > wslb-package.json
+          {
+            "version": "${{ env.VERSION }}",
+            "description": "WSLB – A tool for managing WSL binaries",
+            "homepage": "https://github.com/wsl-images/wslb",
+            "license": "MIT",
+            "url": "https://github.com/wsl-images/wslb/releases/download/v${{ env.VERSION }}/wslb.exe",
+            "hash": "sha256:${{ env.HASH }}",
+            "architecture": {
+              "64bit": {
+                "bin": ["wslb.exe"]
+              }
+            }
+          }
+          EOF
+
+      - name: Commit and push updated wslb-package.json
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add wslb-package.json
+          git commit -m "Update wslb-package.json for release v${{ env.VERSION }}"
+          git push origin main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           name: WSLB v${{ env.VERSION }}
+          files: |
+            ./bin/wslb.exe
+            ./bin/wslb
           generate_release_notes: true
           body: |
             ## WSLB v${{ env.VERSION }}
 
             ### Installation
-            
-            Instll with Go:
+
+            Install with Go:
             ```
             go install github.com/wsl-images/wslb@v${{ env.VERSION }}
             ```
-            
+
+            Install with Scoop:
+            ```
+            scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
+            ```
+
             Or download the binary directly from the assets below.
