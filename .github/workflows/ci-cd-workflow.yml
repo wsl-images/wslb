@@ -126,3 +126,22 @@ jobs:
           git pull origin develop
           git merge --no-ff master -m "Merge master into develop after release ${VERSION}"
           git push origin develop
+
+      - name: Update manifest in bucket repository
+        run: |
+          # Create temp directory for bucket repo
+          mkdir -p /tmp/bucket-repo
+
+          # Clone the bucket repository
+          git clone https://x-access-token:${{ secrets.BUCKET_REPO_TOKEN }}@github.com/wsl-images/wsl-images-bucket.git /tmp/bucket-repo
+
+          # Copy the manifest file to bucket repository
+          cp wslb.json /tmp/bucket-repo/bucket/
+
+          # Commit and push changes to bucket repository
+          cd /tmp/bucket-repo
+          git config user.name "github-actions"
+          git config user.email "action@github.com"
+          git add bucket/wslb.json
+          git commit -m "Update wslb to version ${VERSION}"
+          git push
