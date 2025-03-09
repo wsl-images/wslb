@@ -94,8 +94,7 @@ jobs:
         run: |
           jq ".version = \"${VERSION}\" |
               .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb_${VERSION}_windows_amd64.zip\" |
-              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\" |
-              .extract_dir = \"wslb_${VERSION}\"" wslb.json > wslb_new.json
+              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
           mv wslb_new.json wslb.json
           cat wslb.json
           git add wslb.json
