@@ -59,7 +59,7 @@ jobs:
       - name: Create updated version-specific package file
         run: |
           # Create version-specific package file for this release
-          cat <<EOF > ./bin/wslb-package-v${{ env.VERSION }}.json
+          cat <<EOF > ./bin/wslb${{ env.VERSION }}.json
           {
             "name": "wslb",
             "version": "${{ env.VERSION }}",
@@ -90,7 +90,7 @@ jobs:
           files: |
             ./bin/wslb.exe
             ./bin/wslb
-            ./bin/wslb-package-v${{ env.VERSION }}.json
+            ./bin/wslb${{ env.VERSION }}.json
           generate_release_notes: true
           body: |
             ## WSLB v${{ env.VERSION }}
@@ -104,12 +104,12 @@ jobs:
 
             Install with Scoop (version-specific):
             ```
-            scoop install https://github.com/wsl-images/wslb/releases/download/v${{ env.VERSION }}/wslb-package-v${{ env.VERSION }}.json
+            scoop install https://github.com/wsl-images/wslb/releases/download/v${{ env.VERSION }}/wslb${{ env.VERSION }}.json
             ```
 
             Or install latest version:
             ```
-            scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
+            scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb.json
             ```
 
             Or download the binary directly from the assets below.
@@ -124,9 +124,9 @@ jobs:
         run: |
           sed -i "s/Version = \".*\"/Version = \"${{ env.VERSION }}\"/" internal/version/version.go
 
-      - name: Update wslb-package.json on main
+      - name: Update wslb.json on main
         run: |
-          cat <<EOF > wslb-package.json
+          cat <<EOF > wslb.json
           {
             "name": "wslb",
             "version": "${{ env.VERSION }}",
@@ -153,6 +153,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add wslb-package.json internal/version/version.go
+          git add wslb.json internal/version/version.go
           git commit -m "Update version to v${{ env.VERSION }}"
           git push origin main
