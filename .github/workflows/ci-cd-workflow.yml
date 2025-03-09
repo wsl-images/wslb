@@ -62,13 +62,14 @@ jobs:
             git commit -m "chore: update version.go to ${VERSION}"
           fi
 
+      - name: Set Up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.21'
+
       - name: Build Release Binary (Windows)
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
-
-      - name: Create ZIP Package
-        run: |
-          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
 
       - name: Compute SHA256 of wslb.exe
         id: compute_hash
@@ -77,12 +78,17 @@ jobs:
           echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
+      - name: Create ZIP Package
+        run: |
+          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
+
       - name: Update Scoop Manifest (wslb.json)
         run: |
           jq ".version = \"${VERSION}\" |
               .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb.exe\" |
               .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
           mv wslb_new.json wslb.json
+          cat wslb.json
           git add wslb.json
           git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
 
