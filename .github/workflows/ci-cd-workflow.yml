@@ -1,0 +1,115 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - 'release/*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-lint:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.21'
+
+      - name: Run Unit Tests
+        run: go test -v ./...
+
+      - name: Run Linter
+        run: go vet ./...
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: test-and-lint
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - name: Checkout Code (Full History)
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set VERSION Variable
+        run: |
+          # Extract version number by removing the "refs/heads/release/" prefix
+          VERSION=${GITHUB_REF#refs/heads/release/}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version set to $VERSION"
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "action@github.com"
+
+      - name: Update version.go if Needed
+        run: |
+          if grep -q "Version = \"${VERSION}\"" internal/version/version.go; then
+            echo "internal/version/version.go already contains ${VERSION}"
+          else
+            sed -i "s/Version = \".*\"/Version = \"${VERSION}\"/" internal/version/version.go
+            git add internal/version/version.go
+            git commit -m "chore: update version.go to ${VERSION}"
+          fi
+
+      - name: Build Release Binary (Windows)
+        run: |
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
+
+      - name: Compute SHA256 of wslb.exe
+        id: compute_hash
+        run: |
+          HASH=$(sha256sum wslb.exe | awk '{print $1}')
+          echo "::set-output name=sha256::$HASH"
+          echo "Computed SHA256: $HASH"
+
+      - name: Update Scoop Manifest (wslb.json)
+        run: |
+          jq ".version = \"${VERSION}\" |
+              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb.exe\" |
+              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
+          mv wslb_new.json wslb.json
+          git add wslb.json
+          git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
+
+      - name: Create Git Tag
+        run: |
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${VERSION}"
+          name: "WSLB v${VERSION}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${VERSION}"
+          files: wslb.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge Release Branch into master
+        run: |
+          git fetch origin master
+          git checkout master
+          git pull origin master
+          git merge --no-ff "${GITHUB_REF}" -m "Merge release ${VERSION} into master"
+          git push origin master
