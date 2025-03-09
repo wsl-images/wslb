@@ -29,6 +29,14 @@ func (f *CustomTextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		}
 	}
 
+	if entry.Level == logrus.ErrorLevel {
+		// Find the start of the message by skipping "INFO" and space
+		parts := bytes.SplitN(b, []byte(" "), 2)
+		if len(parts) == 2 {
+			return parts[1], nil
+		}
+	}
+
 	return b, nil
 }
 
