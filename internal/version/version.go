@@ -1,7 +1,7 @@
 package version
 
 var (
-	Version = "1.0.0"
+	Version = "1.0.2"
 )
 
 func GetVersionInfo() string {
