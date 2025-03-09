@@ -82,13 +82,6 @@ jobs:
           echo "sha256=$HASH" >> $GITHUB_OUTPUT
           echo "Computed SHA256: $HASH"
 
-      - name: Compute SHA256 of Linux Binary
-        id: compute_linux_hash
-        run: |
-          HASH=$(sha256sum wslb | awk '{print $1}')
-          echo "sha256=$HASH" >> $GITHUB_OUTPUT
-          echo "Computed Linux SHA256: $HASH"    
-
       - name: Create ZIP Package
         run: |
           zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
@@ -121,9 +114,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            wslb.exe
             wslb_${{ env.VERSION }}_windows_amd64.zip
-            wslb
             wslb_${{ env.VERSION }}_linux_amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
