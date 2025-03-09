@@ -4,7 +4,7 @@
   "homepage": "https://github.com/wsl-images/wslb",
   "license": "MIT",
   "url": "https://github.com/wsl-images/wslb/releases/download/v0.0.1/wslb.exe",
-  "hash": "sha256:1998f0e02dcce11dfa28a26c51a868b80d3c2070d34bfd799d9664fbaa3594dd",
+  "hash": "sha256:3bf3f440eff4c5ddebbcaf581e350d0bd0dc0593ec5bc0ae17313862de0c7a98",
   "architecture": {
     "64bit": {
       "bin": [
