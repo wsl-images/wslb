@@ -21,7 +21,7 @@ jobs:
       - name: Set Up Go
         uses: actions/setup-go@v3
         with:
-          go-version: '1.21'
+          go-version: "1.20.x"
 
       - name: Run Unit Tests
         run: go test -v ./...
@@ -42,7 +42,7 @@ jobs:
 
       - name: Set VERSION Variable
         run: |
-          # Extract version number by removing the "refs/heads/release/" prefix
+          # Extract version by stripping "refs/heads/release/" prefix
           VERSION=${GITHUB_REF#refs/heads/release/}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Version set to $VERSION"
@@ -65,6 +65,10 @@ jobs:
       - name: Build Release Binary (Windows)
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
+
+      - name: Create ZIP Package
+        run: |
+          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe
 
       - name: Compute SHA256 of wslb.exe
         id: compute_hash
@@ -91,18 +95,28 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${VERSION}"
-          name: "WSLB v${VERSION}"
+          tag_name: "v${{ env.VERSION }}"
+          name: "WSLB v${{ env.VERSION }}"
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Asset
+      - name: Upload Executable Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${VERSION}"
+          tag_name: "v${{ env.VERSION }}"
           files: wslb.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ZIP Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: "wslb_${{ env.VERSION }}_windows_amd64.zip"
+          asset_name: "wslb_${{ env.VERSION }}_windows_amd64.zip"
+          asset_content_type: application/zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
