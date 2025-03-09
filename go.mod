@@ -1,6 +1,6 @@
 module github.com/wsl-images/wslb
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/sirupsen/logrus v1.9.3
