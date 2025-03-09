@@ -31,7 +31,6 @@ jobs:
           VERSION=${{ env.VERSION }}
           # Build Windows binary
           GOOS=windows GOARCH=amd64 go build -o ./bin/wslb.exe .
-
           # Build Linux binary
           GOOS=linux GOARCH=amd64 go build -o ./bin/wslb .
 
@@ -40,9 +39,64 @@ jobs:
           HASH=$(sha256sum ./bin/wslb.exe | awk '{print $1}')
           echo "HASH=$HASH" >> $GITHUB_ENV
 
-      - name: Update wslb-package.json
+      - name: Create updated version-specific package file
         run: |
-          # Update version, URL, hash, and fix architecture format
+          # Create version-specific package file for this release
+          cat <<EOF > ./bin/wslb-package-v${{ env.VERSION }}.json
+          {
+            "version": "${{ env.VERSION }}",
+            "description": "WSLB – A tool for managing WSL binaries",
+            "homepage": "https://github.com/wsl-images/wslb",
+            "license": "MIT",
+            "url": "https://github.com/wsl-images/wslb/releases/download/v${{ env.VERSION }}/wslb.exe",
+            "hash": "sha256:${{ env.HASH }}",
+            "architecture": {
+              "64bit": {
+                "bin": ["wslb.exe"]
+              }
+            }
+          }
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: WSLB v${{ env.VERSION }}
+          files: |
+            ./bin/wslb.exe
+            ./bin/wslb
+            ./bin/wslb-package-v${{ env.VERSION }}.json
+          generate_release_notes: true
+          body: |
+            ## WSLB v${{ env.VERSION }}
+
+            ### Installation
+
+            Install with Go:
+            ```
+            go install github.com/wsl-images/wslb@v${{ env.VERSION }}
+            ```
+
+            Install with Scoop (version-specific):
+            ```
+            scoop install https://github.com/wsl-images/wslb/releases/download/v${{ env.VERSION }}/wslb-package-v${{ env.VERSION }}.json
+            ```
+
+            Or install latest version:
+            ```
+            scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
+            ```
+
+            Or download the binary directly from the assets below.
+
+      # Update the main branch package as well
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update wslb-package.json on main
+        run: |
           cat <<EOF > wslb-package.json
           {
             "version": "${{ env.VERSION }}",
@@ -66,28 +120,3 @@ jobs:
           git add wslb-package.json
           git commit -m "Update wslb-package.json for release v${{ env.VERSION }}"
           git push origin main
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: WSLB v${{ env.VERSION }}
-          files: |
-            ./bin/wslb.exe
-            ./bin/wslb
-          generate_release_notes: true
-          body: |
-            ## WSLB v${{ env.VERSION }}
-
-            ### Installation
-
-            Install with Go:
-            ```
-            go install github.com/wsl-images/wslb@v${{ env.VERSION }}
-            ```
-
-            Install with Scoop:
-            ```
-            scoop install https://raw.githubusercontent.com/wsl-images/wslb/main/wslb-package.json
-            ```
-
-            Or download the binary directly from the assets below.
