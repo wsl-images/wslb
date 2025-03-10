@@ -50,14 +50,6 @@ jobs:
             exit 1
           fi
 
-      - name: Update Scoop Manifest (wslb.json)
-        run: |
-          jq ".version = \"${VERSION}\" | 
-              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb.exe\"" wslb.json > wslb_new.json
-          mv wslb_new.json wslb.json
-          git add wslb.json
-          git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
-
       - name: Push Release Branch
         run: |
           git push -u origin "release/${VERSION}"

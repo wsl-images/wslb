@@ -1,0 +1,90 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats: zip
+
+nfpms:
+  -
+    id: default
+    package_name: wslb
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: WSL-Images.
+    homepage: https://github.com/wsl-images
+    maintainer: stevenbuglione1@gmail.com
+    description: |-
+      WSLB is a command-line tool that simplifies building and installing Windows Subsystem for Linux (WSL) distributions from Docker images.
+    license: MIT
+
+    formats:
+      - deb
+
+scoops:
+  -
+    name: wslb
+    url_template: "https://github.com/wsl-images/wslb/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/wsl-images"
+    description: "WSLB is a command-line tool that simplifies building and installing Windows Subsystem for Linux (WSL) distributions from Docker images."
+    license: MIT
+    directory: bucket
+    skip_upload: false
+    repository:
+      owner: wsl-images
+      name: wsl-images-bucket
+      branch: master
+      token: "{{ .Env.BUCKET_REPO_TOKEN }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).

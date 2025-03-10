@@ -5,3 +5,5 @@ wslb.iml
 bin
 /installer/wslb-installer/.vs/
 /installer/wslb-installer/obj/
+# Added by goreleaser init:
+dist/

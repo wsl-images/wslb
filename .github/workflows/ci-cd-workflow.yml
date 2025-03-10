@@ -52,72 +52,19 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "action@github.com"
 
-      - name: Update version.go if Needed
-        run: |
-          if grep -q "Version = \"${VERSION}\"" internal/version/version.go; then
-            echo "internal/version/version.go already contains ${VERSION}"
-          else
-            sed -i "s/Version = \".*\"/Version = \"${VERSION}\"/" internal/version/version.go
-            git add internal/version/version.go
-            git commit -m "chore: update version.go to ${VERSION}"
-          fi
 
-      - name: Set Up Go
-        uses: actions/setup-go@v3
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          go-version: '1.21'
-
-      - name: Build Release Binary (Windows)
-        run: |
-          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb.exe .
-
-      - name: Create ZIP Package
-        run: |
-          zip "wslb_${VERSION}_windows_amd64.zip" wslb.exe    
-
-      - name: Compute SHA256 of ZIP package
-        id: compute_hash
-        run: |
-          HASH=$(sha256sum "wslb_${VERSION}_windows_amd64.zip" | awk '{print $1}')
-          echo "sha256=$HASH" >> $GITHUB_OUTPUT
-          echo "Computed SHA256: $HASH"
-
-      - name: Update Scoop Manifest (wslb.json)
-        run: |
-          jq ".version = \"${VERSION}\" |
-              .url = \"https://github.com/wsl-images/wslb/releases/download/v${VERSION}/wslb_${VERSION}_windows_amd64.zip\" |
-              .hash = \"sha256:${{ steps.compute_hash.outputs.sha256 }}\"" wslb.json > wslb_new.json
-          mv wslb_new.json wslb.json
-          cat wslb.json
-          git add wslb.json
-          git commit -m "chore: update Scoop manifest for ${VERSION}" || echo "No changes to manifest"
-
-      - name: Build Release Binary (Linux)
-        run: |
-          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o wslb .
-
-      - name: Create Linux TAR Package
-        run: |
-          tar -czvf "wslb_${VERSION}_linux_amd64.tar.gz" wslb        
-
-      - name: Create Git Tag
-        run: |
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin "v${VERSION}"
-
-      - name: Create GitHub Release with Assets
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v${{ env.VERSION }}"
-          name: "WSLB v${{ env.VERSION }}"
-          draft: false
-          prerelease: false
-          files: |
-            wslb_${{ env.VERSION }}_windows_amd64.zip
-            wslb_${{ env.VERSION }}_linux_amd64.tar.gz
+          # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser
+          # 'latest', 'nightly', or a semver
+          version: "~> v2"
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUCKET_REPO_TOKEN: ${{ secrets.BUCKET_REPO_TOKEN }}
+
 
       - name: Merge Release Branch into master
         run: |
@@ -134,22 +81,3 @@ jobs:
           git pull origin develop
           git merge --no-ff master -m "Merge master into develop after release ${VERSION}"
           git push origin develop
-
-      - name: Update manifest in bucket repository
-        run: |
-          # Create temp directory for bucket repo
-          mkdir -p /tmp/bucket-repo
-
-          # Clone the bucket repository
-          git clone https://x-access-token:${{ secrets.BUCKET_REPO_TOKEN }}@github.com/wsl-images/wsl-images-bucket.git /tmp/bucket-repo
-
-          # Copy the manifest file to bucket repository
-          cp wslb.json /tmp/bucket-repo/bucket/
-
-          # Commit and push changes to bucket repository
-          cd /tmp/bucket-repo
-          git config user.name "github-actions"
-          git config user.email "action@github.com"
-          git add bucket/wslb.json
-          git commit -m "Update wslb to version ${VERSION}"
-          git push
