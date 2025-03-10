@@ -22,6 +22,9 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
 
 archives:
   - formats: tar.gz
@@ -64,7 +67,6 @@ scoops:
     homepage: "https://github.com/wsl-images"
     description: "WSLB is a command-line tool that simplifies building and installing Windows Subsystem for Linux (WSL) distributions from Docker images."
     license: MIT
-    goamd64: v3
     directory: bucket
     skip_upload: false
     repository:
