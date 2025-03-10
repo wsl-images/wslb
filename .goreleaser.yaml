@@ -75,7 +75,6 @@ scoops:
       branch: master
       token: "{{ .Env.BUCKET_REPO_TOKEN }}"
 
-
 changelog:
   sort: asc
   filters:
