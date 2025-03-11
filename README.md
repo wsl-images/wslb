@@ -6,7 +6,6 @@ WSLB is a command-line tool that simplifies building and installing Windows Subs
 
 - Build custom WSL distributions from any Docker image
 - Install WSL distributions directly from Docker image URLs
-- Install pre-built WSL distribution files
 - Manage WSL distributions (list, stop, remove)
 
 ## Installation
