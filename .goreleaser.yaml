@@ -76,11 +76,7 @@ scoops:
       token: "{{ .Env.BUCKET_REPO_TOKEN }}"
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
+  disable: "{{ .Env.CREATE_CHANGELOG }}"
 
 release:
   footer: >-
