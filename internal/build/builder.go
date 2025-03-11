@@ -73,7 +73,7 @@ func BuildWSL(dockerImage, outputDir string, verbose bool) string {
 			os.Exit(1)
 		}
 
-		if header.Name == "etc/resolv.conf" {
+		if header.Name == "etc/resolv.conf" || header.Name == ".dockerenv" {
 			continue
 		}
 
