@@ -64,7 +64,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUCKET_REPO_TOKEN: ${{ secrets.BUCKET_REPO_TOKEN }}
-          CREATE_CHANGELOG: false
+          CREATE_CHANGELOG: true
 
 
       - name: Merge Release Branch into master
