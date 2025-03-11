@@ -7,9 +7,10 @@ on:
       - "*"
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Select tag for release (v1.2.3)'
+      branch:
+        description: 'Select Release Tag'
         required: true
+        default: 'develop'
         type: string
 
 permissions:
