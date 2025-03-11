@@ -6,12 +6,6 @@ on:
     tags:
       - "*"
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Select Release Tag'
-        required: true
-        default: 'develop'
-        type: string
 
 permissions:
   contents: write
