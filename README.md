@@ -28,6 +28,11 @@ scoop bucket add wsl-images-bucket https://github.com/wsl-images/wsl-images-buck
 scoop install wsl-images-bucket/wslb 
 ```
 
+### Install With NPM(Windows x86_64 Only)
+```bash
+npm install -g @wsl-images/wslb-cli
+```
+
 ### Antivirus and Anti Malware Problems with Scoop
 ```bash
 Add-MpPreference -ExclusionPath "$($env:programdata)\scoop", "$($env:scoop)"
