@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "WSLB commandline tool built with Go",
   "bin": {
-    "wslb": "./bin/wslb"
+    "wslb": "./bin/wslb.exe"
   },
   "files": [
     "bin/"
