@@ -28,7 +28,9 @@ scoop bucket add wsl-images-bucket https://github.com/wsl-images/wsl-images-buck
 scoop install wsl-images-bucket/wslb 
 ```
 
-### Install With NPM (Windows x86_64 Only)[@wsl-images/wslb-cli]("https://www.npmjs.com/package/@wsl-images/wslb-cli")
+### Install With NPM (Windows x86_64 Only)
+
+[@wsl-images/wslb-cli](https://www.npmjs.com/package/@wsl-images/wslb-cli)
 ```bash
 npm install -g @wsl-images/wslb-cli
 ```
