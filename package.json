@@ -1,0 +1,15 @@
+{
+  "name": "@wsl-images/wslb-cli",
+  "version": "1.0.0",
+  "description": "WSLB commandline tool built with Go",
+  "bin": {
+    "wslb": "./bin/wslb"
+  },
+  "files": [
+    "bin/"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
