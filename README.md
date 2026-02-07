@@ -20,7 +20,7 @@ You can also use a `devcontainer` superset with a top-level `wslb` block (`.json
 ./wslb.exe wsl --workspace-file .devcontainer/devcontainer.json install <imageId>
 ```
 
-The `wslb` superset supports full `wsl.conf` sections and `/etc/wsl-distribution.conf` settings (`oobe`, shortcut icon), including `simpleIcon` slugs from Simple Icons.
+The `wslb` superset supports full `wsl.conf` sections, optional host `.wslconfig` management (`wslb.wslconfig`), and `/etc/wsl-distribution.conf` settings (`oobe`, shortcut/icon, `windowsterminal`/`windowsTerminal`, profile templates), including `simpleIcon` slugs from Simple Icons.
 Schema URL for editor association:
 - `https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json`
 

@@ -40,6 +40,7 @@ type WSLImageConfig struct {
 	DefaultUser  WSLDefaultUser         `yaml:"defaultUser" json:"defaultUser"`
 	State        *WSLStateConfig        `yaml:"state" json:"state,omitempty"`
 	WSLConf      WSLConfConfig          `yaml:"wslconf" json:"wslconf"`
+	WSLConfig    *WSLGlobalConfig       `yaml:"wslconfig,omitempty" json:"wslconfig,omitempty"`
 	Distribution *WSLDistributionConfig `yaml:"distribution" json:"distribution,omitempty"`
 	Features     []FeatureAssignment    `yaml:"features" json:"features"`
 }
@@ -68,6 +69,8 @@ type WSLConfConfig struct {
 	Automount *WSLConfAutomount `yaml:"automount,omitempty" json:"automount,omitempty"`
 	Network   *WSLConfNetwork   `yaml:"network,omitempty" json:"network,omitempty"`
 	Interop   *WSLConfInterop   `yaml:"interop,omitempty" json:"interop,omitempty"`
+	GPU       *WSLConfGPU       `yaml:"gpu,omitempty" json:"gpu,omitempty"`
+	Time      *WSLConfTime      `yaml:"time,omitempty" json:"time,omitempty"`
 }
 
 type WSLConfUser struct {
@@ -75,15 +78,17 @@ type WSLConfUser struct {
 }
 
 type WSLConfBoot struct {
-	Systemd *bool  `yaml:"systemd,omitempty" json:"systemd,omitempty"`
-	Command string `yaml:"command,omitempty" json:"command,omitempty"`
+	Systemd       *bool  `yaml:"systemd,omitempty" json:"systemd,omitempty"`
+	Command       string `yaml:"command,omitempty" json:"command,omitempty"`
+	ProtectBinfmt *bool  `yaml:"protectBinfmt,omitempty" json:"protectBinfmt,omitempty"`
 }
 
 type WSLConfAutomount struct {
-	Enabled    *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
-	Root       string `yaml:"root,omitempty" json:"root,omitempty"`
-	Options    string `yaml:"options,omitempty" json:"options,omitempty"`
-	MountFsTab *bool  `yaml:"mountFsTab,omitempty" json:"mountFsTab,omitempty"`
+	Enabled     *bool  `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Root        string `yaml:"root,omitempty" json:"root,omitempty"`
+	Options     string `yaml:"options,omitempty" json:"options,omitempty"`
+	MountFsTab  *bool  `yaml:"mountFsTab,omitempty" json:"mountFsTab,omitempty"`
+	CrossDistro *bool  `yaml:"crossDistro,omitempty" json:"crossDistro,omitempty"`
 }
 
 type WSLConfNetwork struct {
@@ -97,9 +102,18 @@ type WSLConfInterop struct {
 	AppendWindowsPath *bool `yaml:"appendWindowsPath,omitempty" json:"appendWindowsPath,omitempty"`
 }
 
+type WSLConfGPU struct {
+	Enabled *bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+}
+
+type WSLConfTime struct {
+	UseWindowsTimezone *bool `yaml:"useWindowsTimezone,omitempty" json:"useWindowsTimezone,omitempty"`
+}
+
 type WSLDistributionConfig struct {
-	OOBE     *WSLDistributionOOBE     `yaml:"oobe,omitempty" json:"oobe,omitempty"`
-	Shortcut *WSLDistributionShortcut `yaml:"shortcut,omitempty" json:"shortcut,omitempty"`
+	OOBE            *WSLDistributionOOBE            `yaml:"oobe,omitempty" json:"oobe,omitempty"`
+	Shortcut        *WSLDistributionShortcut        `yaml:"shortcut,omitempty" json:"shortcut,omitempty"`
+	WindowsTerminal *WSLDistributionWindowsTerminal `yaml:"windowsterminal,omitempty" json:"windowsterminal,omitempty"`
 }
 
 type WSLDistributionOOBE struct {
@@ -113,11 +127,23 @@ type WSLDistributionShortcut struct {
 	Icon    WSLDIcon `yaml:"icon,omitempty" json:"icon,omitempty"`
 }
 
+type WSLDistributionWindowsTerminal struct {
+	Enabled         *bool           `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	ProfileTemplate string          `yaml:"profileTemplate,omitempty" json:"profileTemplate,omitempty"`
+	Template        json.RawMessage `yaml:"template,omitempty" json:"template,omitempty"`
+}
+
 type WSLDIcon struct {
 	Path       string `yaml:"path,omitempty" json:"path,omitempty"`
 	SimpleIcon string `yaml:"simpleIcon,omitempty" json:"simpleIcon,omitempty"`
 	Color      string `yaml:"color,omitempty" json:"color,omitempty"`
 	Style      string `yaml:"style,omitempty" json:"style,omitempty"`
+}
+
+type WSLGlobalConfig struct {
+	Apply        *bool                  `yaml:"apply,omitempty" json:"apply,omitempty"`
+	WSL2         map[string]interface{} `yaml:"wsl2,omitempty" json:"wsl2,omitempty"`
+	Experimental map[string]interface{} `yaml:"experimental,omitempty" json:"experimental,omitempty"`
 }
 
 type FeatureAssignment struct {
@@ -188,6 +214,20 @@ func (c *WSLConfConfig) UnmarshalJSON(data []byte) error {
 		}
 		out.Interop = &interop
 	}
+	if v, ok := raw["gpu"]; ok {
+		var gpu WSLConfGPU
+		if err := json.Unmarshal(v, &gpu); err != nil {
+			return fmt.Errorf("wslconf.gpu: %w", err)
+		}
+		out.GPU = &gpu
+	}
+	if v, ok := raw["time"]; ok {
+		var timeCfg WSLConfTime
+		if err := json.Unmarshal(v, &timeCfg); err != nil {
+			return fmt.Errorf("wslconf.time: %w", err)
+		}
+		out.Time = &timeCfg
+	}
 	if v, ok := raw["systemd"]; ok {
 		var sys bool
 		if err := json.Unmarshal(v, &sys); err != nil {
@@ -212,6 +252,108 @@ func (i *WSLDIcon) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*i = WSLDIcon(out)
+	return nil
+}
+
+func (d *WSLDistributionConfig) UnmarshalJSON(data []byte) error {
+	type alias WSLDistributionConfig
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		var out alias
+		if err2 := json.Unmarshal(data, &out); err2 != nil {
+			return err
+		}
+		*d = WSLDistributionConfig(out)
+		return nil
+	}
+
+	var out alias
+	if v, ok := raw["oobe"]; ok {
+		var oobe WSLDistributionOOBE
+		if err := json.Unmarshal(v, &oobe); err != nil {
+			return fmt.Errorf("distribution.oobe: %w", err)
+		}
+		out.OOBE = &oobe
+	}
+	if v, ok := raw["shortcut"]; ok {
+		var shortcut WSLDistributionShortcut
+		if err := json.Unmarshal(v, &shortcut); err != nil {
+			return fmt.Errorf("distribution.shortcut: %w", err)
+		}
+		out.Shortcut = &shortcut
+	}
+
+	var (
+		legacyWT json.RawMessage
+		camelWT  json.RawMessage
+	)
+	if v, ok := raw["windowsterminal"]; ok {
+		legacyWT = v
+	}
+	if v, ok := raw["windowsTerminal"]; ok {
+		camelWT = v
+	}
+	if len(legacyWT) > 0 && len(camelWT) > 0 {
+		return fmt.Errorf("distribution: use only one of `windowsterminal` or `windowsTerminal`")
+	}
+	switch {
+	case len(legacyWT) > 0:
+		var wt WSLDistributionWindowsTerminal
+		if err := json.Unmarshal(legacyWT, &wt); err != nil {
+			return fmt.Errorf("distribution.windowsterminal: %w", err)
+		}
+		out.WindowsTerminal = &wt
+	case len(camelWT) > 0:
+		var wt WSLDistributionWindowsTerminal
+		if err := json.Unmarshal(camelWT, &wt); err != nil {
+			return fmt.Errorf("distribution.windowsTerminal: %w", err)
+		}
+		out.WindowsTerminal = &wt
+	}
+
+	*d = WSLDistributionConfig(out)
+	return nil
+}
+
+func (wt *WSLDistributionWindowsTerminal) UnmarshalJSON(data []byte) error {
+	type alias WSLDistributionWindowsTerminal
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		var out alias
+		if err2 := json.Unmarshal(data, &out); err2 != nil {
+			return err
+		}
+		*wt = WSLDistributionWindowsTerminal(out)
+		return nil
+	}
+	var out alias
+	if v, ok := raw["enabled"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			return fmt.Errorf("windowsterminal.enabled: %w", err)
+		}
+		out.Enabled = &b
+	}
+	if v, ok := raw["profileTemplate"]; ok {
+		if err := json.Unmarshal(v, &out.ProfileTemplate); err != nil {
+			return fmt.Errorf("windowsterminal.profileTemplate: %w", err)
+		}
+	}
+	if v, ok := raw["ProfileTemplate"]; ok {
+		if err := json.Unmarshal(v, &out.ProfileTemplate); err != nil {
+			return fmt.Errorf("windowsterminal.ProfileTemplate: %w", err)
+		}
+	}
+	if v, ok := raw["template"]; ok {
+		out.Template = append(out.Template[:0], v...)
+	}
+	if v, ok := raw["templateJson"]; ok {
+		out.Template = append(out.Template[:0], v...)
+	}
+	if v, ok := raw["Template"]; ok {
+		out.Template = append(out.Template[:0], v...)
+	}
+	*wt = WSLDistributionWindowsTerminal(out)
 	return nil
 }
 

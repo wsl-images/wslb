@@ -46,6 +46,20 @@
           "color": "E95420",
           "style": "flat"
         }
+      },
+      "windowsTerminal": {
+        "enabled": true,
+        "template": {
+          "profiles": [
+            {
+              "name": "UbuntuDevcontainer",
+              "font": {
+                "face": "Cascadia Mono"
+              },
+              "historySize": 10000
+            }
+          ]
+        }
       }
     }
   }

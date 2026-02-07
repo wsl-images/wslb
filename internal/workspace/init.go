@@ -48,6 +48,9 @@ const defaultDevcontainerSuperset = `{
           "color": "E95420",
           "style": "flat"
         }
+      },
+      "windowsTerminal": {
+        "enabled": true
       }
     }
   }

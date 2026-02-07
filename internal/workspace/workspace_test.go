@@ -195,3 +195,52 @@ func TestValidateDistributionIconConflict(t *testing.T) {
 		t.Fatalf("expected icon conflict issue, got: %+v", res.Issues)
 	}
 }
+
+func TestValidateWSLConfigRequiresScalarValues(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Workspace: WorkspaceConfig{
+			Name:      "demo",
+			OutputDir: "./.wslb-out",
+		},
+		Images: []Image{
+			{
+				ID:     "img",
+				Target: "wsl",
+				Base:   "ubuntu:24.04",
+				WSL: &WSLImageConfig{
+					Managed:    false,
+					DistroName: "Demo",
+					InstallDir: "./distros/demo",
+					DefaultUser: WSLDefaultUser{
+						Name: "dev",
+						UID:  1000,
+						GID:  1000,
+					},
+					WSLConf: DefaultWSLConfConfig(),
+					WSLConfig: &WSLGlobalConfig{
+						WSL2: map[string]interface{}{
+							"memory": "4GB",
+							"nested": map[string]interface{}{"bad": true},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	res := Validate(m, filepath.Join(t.TempDir(), "devcontainer.json"))
+	if res.Valid {
+		t.Fatalf("expected invalid result")
+	}
+	found := false
+	for _, i := range res.Issues {
+		if i.Code == "WSLB_WSLCONFIG_VALUE_INVALID" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected WSLB_WSLCONFIG_VALUE_INVALID issue, got: %+v", res.Issues)
+	}
+}

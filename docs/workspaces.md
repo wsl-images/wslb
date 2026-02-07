@@ -1,13 +1,27 @@
-# Workspaces
+# Workspaces (Devcontainer Superset for WSL)
 
-`wslb` supports a convention-first `devcontainer` superset:
+`wslb` uses a convention-first `devcontainer` superset:
 
 - `.devcontainer/devcontainer.json`
 - `.devcontainer/devcontainer.jsonc`
 - `devcontainer.json`
 - `devcontainer.jsonc`
 
-## Superset Shape
+## Schema Association
+
+Use this at the top of your file:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json"
+}
+```
+
+Local schema path in this repo:
+
+- `schemas/wslb-workspace.schema.json`
+
+## Minimal Example
 
 ```json
 {
@@ -19,71 +33,116 @@
   },
   "remoteUser": "dev",
   "wslb": {
-    "distroName": "DevUbuntu",
+    "distroName": "UbuntuDev",
     "managed": true,
     "state": {
       "mode": "windows-dir"
     },
     "wslconf": {
-      "boot": { "systemd": true }
+      "boot": {
+        "systemd": true
+      }
     },
     "distribution": {
-      "oobe": { "defaultName": "dev" },
       "shortcut": {
         "enabled": true,
-        "icon": { "simpleIcon": "ubuntu", "color": "E95420", "style": "flat" }
+        "icon": {
+          "simpleIcon": "ubuntu",
+          "color": "E95420",
+          "style": "flat"
+        }
+      },
+      "windowsTerminal": {
+        "enabled": true,
+        "template": {
+          "profiles": [
+            {
+              "font": { "face": "Cascadia Mono" }
+            }
+          ]
+        }
       }
     }
   }
 }
 ```
 
-## Convention Over Configuration
+## Convention Defaults
 
-You no longer need to repeat most WSL-only values:
+You do not need to repeat many WSL-only values:
 
-- `target` is implicit (`wsl`); if provided it must still be `wsl`
-- `workspaceName` defaults from `name`
-- `outputDir` defaults to `./.wslb-out`
-- `installDir` defaults to `<outputDir>/distros/<distroName>`
-- `imageId` defaults from `wslb.id` / `wslb.imageId` / `wslb.distroName` / `name`
-- `wslb.user` defaults from `remoteUser` (or `containerUser`, then `dev`)
-- `wslconf.user.default` defaults from resolved user name
-- `state.path`, `state.mountPoint`, `state.fsLabel` are defaulted when omitted
-- managed user creation + managed state mount wiring are handled automatically; you do not need to repeat internal features for baseline behavior
+- `wslb.target` defaults to `wsl`
+- image id defaults from `wslb.id` / `wslb.imageId` / `wslb.distroName` / `name`
+- `wslb.workspaceName` defaults from `name`
+- `wslb.outputDir` defaults to `./.wslb-out`
+- `wslb.installDir` defaults to `<outputDir>/distros/<distroName>`
+- user defaults from `remoteUser` / `containerUser` / `dev`
+- `wslconf.user.default` defaults from resolved user
+- `state.mountPoint` defaults to `/home`
+- `state.fsLabel` defaults to `WSLB_STATE`
 
-## JSON, JSONC, and Schema
+## Advanced WSL Settings
 
-- `wslb` accepts both JSON and JSONC (comments and trailing commas).
-- Schema URL for editor IntelliSense:
-  - `https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json`
-- Local schema file in repo:
-  - `schemas/wslb-workspace.schema.json`
+`wslb.wslconf` maps to `/etc/wsl.conf` and supports the full sections currently implemented:
 
-- Standard Dev Container fields are reused (`name`, `image`, `features`, `remoteUser`).
-- A top-level `wslb` block adds WSL lifecycle settings (`distroName`, `managed`, `state`, `wslconf`, `distribution`).
-- `wslb.wslconf` supports full `wsl.conf` sections:
-  - `user.default`
-  - `boot.systemd`, `boot.command`
-  - `automount.enabled`, `automount.root`, `automount.options`, `automount.mountFsTab`
-  - `network.hostname`, `network.generateHosts`, `network.generateResolvConf`
-  - `interop.enabled`, `interop.appendWindowsPath`
-- `wslb.distribution` writes `/etc/wsl-distribution.conf`:
-  - `oobe.defaultName`, `oobe.defaultUid`, `oobe.command`
-  - `shortcut.enabled`
-  - `windowsterminal.ProfileTemplate` is auto-emitted when an icon is configured
-  - `shortcut.icon` can be:
-    - string path/URL to `.ico`
-    - object `{ "path": "...ico" }`
-    - object `{ "simpleIcon": "<slug>", "color": "E95420", "style": "flat|badge" }` (fetched from Simple Icons and converted to `.ico`)
-- `features` map entries are converted to ordered feature refs/options for the WSL build pipeline.
+- `[user]`: `default`
+- `[boot]`: `systemd`, `command`, `protectBinfmt`
+- `[automount]`: `enabled`, `root`, `options`, `mountFsTab`, `crossDistro`
+- `[network]`: `hostname`, `generateHosts`, `generateResolvConf`
+- `[interop]`: `enabled`, `appendWindowsPath`
+- `[gpu]`: `enabled`
+- `[time]`: `useWindowsTimezone`
 
-Examples:
+Legacy compatibility shortcuts:
 
-- `examples/devcontainer/devcontainer.json`
-- `examples/devcontainer/minimal.json`
-- `examples/devcontainer/managed-vhdx.json`
-- `examples/devcontainer/ubuntu-pro.json`
+- `wslconf.systemd` -> `wslconf.boot.systemd`
+- `wslconf.automount: true|false` -> `wslconf.automount.enabled`
+
+## Custom Distro Metadata
+
+`wslb.distribution` maps to `/etc/wsl-distribution.conf`:
+
+- `oobe.defaultName`, `oobe.defaultUid`, `oobe.command`
+- `shortcut.enabled`
+- `shortcut.icon`
+  - string path/URL to `.ico/.svg/.png/.jpg`
+  - object `{ "path": "..." }`
+  - object `{ "simpleIcon": "ubuntu", "color": "E95420", "style": "flat|badge" }`
+- `windowsterminal.enabled`
+- `windowsterminal.profileTemplate` (compat alias `windowsterminal.ProfileTemplate` is still accepted)
+- `windowsterminal.template` / `windowsterminal.templateJson`
+  - inline JSON object for the Windows Terminal profile template
+  - or string path to a JSON file (resolved relative to the manifest)
+- `windowsTerminal` (camelCase alias for `windowsterminal`; use only one form)
+
+If an icon is set and no profile template is provided, `wslb` auto-generates a template.
+
+## Global VM Settings (.wslconfig)
+
+`wslb.wslconfig` manages `%USERPROFILE%/.wslconfig`:
+
+```json
+{
+  "wslb": {
+    "wslconfig": {
+      "apply": true,
+      "wsl2": {
+        "memory": "4GB",
+        "processors": 4
+      },
+      "experimental": {
+        "sparseVhd": true
+      }
+    }
+  }
+}
+```
+
+Notes:
+
+- `apply` defaults to `true` when `wslconfig` is present.
+- Values under `wsl2` and `experimental` must be scalar (`string`/`number`/`boolean`).
+- When changed, `wslb` writes `%USERPROFILE%/.wslconfig` and runs `wsl --shutdown`.
 
 ## Commands
 
@@ -93,20 +152,9 @@ Examples:
 - `wslb workspace build [--all|<imageId>] [--engine docker|podman]`
 - `wslb workspace publish [--all|<imageId>]`
 
-## Validation Rules
+## References
 
-- `image` is required
-- `wslb.target`, if provided, must be `wsl`
-- managed WSL requires `wslb.state`
-- feature refs must parse as OCI/devcontainer or `wslb:feature/<id>`
-
-## Plan Output
-
-`workspace plan` generates deterministic:
-
-- prerequisites
-- ordered steps
-- artifact paths
-- candidate/backup naming for managed WSL
-
-
+- Microsoft custom distro packaging:
+  - `https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro`
+- Microsoft advanced WSL config (`wsl.conf` and `.wslconfig`):
+  - `https://learn.microsoft.com/en-us/windows/wsl/wsl-config`

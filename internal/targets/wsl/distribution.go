@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -109,13 +110,45 @@ func resolveDistributionAssets(ctx context.Context, manifestPath string, image w
 			}
 		}
 	}
+
 	wtTemplate := ""
 	wtTemplatePath := ""
-	if iconPath != "" {
+	wtEnabledSet := false
+	wtEnabled := false
+	if dist.WindowsTerminal != nil {
+		if dist.WindowsTerminal.Enabled != nil {
+			wtEnabledSet = true
+			wtEnabled = *dist.WindowsTerminal.Enabled
+		}
+		if strings.TrimSpace(dist.WindowsTerminal.ProfileTemplate) != "" {
+			wtTemplatePath = strings.TrimSpace(dist.WindowsTerminal.ProfileTemplate)
+		}
+		if len(bytes.TrimSpace(dist.WindowsTerminal.Template)) > 0 {
+			resolvedTemplate, err := resolveWTTemplate(manifestPath, dist.WindowsTerminal.Template)
+			if err != nil {
+				return distributionAssets{}, err
+			}
+			wtTemplate = resolvedTemplate
+		}
+	}
+	if wtTemplatePath == "" && wtTemplate != "" {
+		wtTemplatePath = defaultWTProfilePath
+	}
+	if iconPath != "" && wtTemplate == "" {
+		if wtTemplatePath == "" {
+			wtTemplatePath = defaultWTProfilePath
+		}
 		wtTemplatePath = defaultWTProfilePath
 		wtTemplate = fmt.Sprintf("{\n  \"profiles\": [\n    {\n      \"icon\": %q\n    }\n  ]\n}\n", iconPath)
+	}
+	if wtEnabledSet || wtTemplatePath != "" {
 		b.WriteString("[windowsterminal]\n")
-		b.WriteString("ProfileTemplate=" + wtTemplatePath + "\n")
+		if wtEnabledSet {
+			b.WriteString("enabled=" + boolToString(wtEnabled) + "\n")
+		}
+		if wtTemplatePath != "" {
+			b.WriteString("ProfileTemplate=" + wtTemplatePath + "\n")
+		}
 	}
 	return distributionAssets{
 		Conf:                  b.String(),
@@ -124,6 +157,48 @@ func resolveDistributionAssets(ctx context.Context, manifestPath string, image w
 		WTProfileTemplatePath: wtTemplatePath,
 		WTProfileTemplateJSON: wtTemplate,
 	}, nil
+}
+
+func resolveWTTemplate(manifestPath string, raw json.RawMessage) (string, error) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return "", nil
+	}
+
+	var pathValue string
+	if err := json.Unmarshal(trimmed, &pathValue); err == nil {
+		pathValue = strings.TrimSpace(pathValue)
+		if pathValue == "" {
+			return "", nil
+		}
+		resolvedPath := pathValue
+		if !filepath.IsAbs(resolvedPath) {
+			resolvedPath = workspace.ResolvePath(manifestPath, pathValue)
+		}
+		b, err := os.ReadFile(resolvedPath)
+		if err != nil {
+			return "", fmt.Errorf("windowsterminal.template path %q: %w", pathValue, err)
+		}
+		if !json.Valid(b) {
+			return "", fmt.Errorf("windowsterminal.template file %q is not valid JSON", pathValue)
+		}
+		var out bytes.Buffer
+		if err := json.Indent(&out, b, "", "  "); err != nil {
+			return "", fmt.Errorf("windowsterminal.template file %q: %w", pathValue, err)
+		}
+		out.WriteByte('\n')
+		return out.String(), nil
+	}
+
+	if !json.Valid(trimmed) {
+		return "", fmt.Errorf("windowsterminal.template must be JSON object or string path")
+	}
+	var out bytes.Buffer
+	if err := json.Indent(&out, trimmed, "", "  "); err != nil {
+		return "", fmt.Errorf("windowsterminal.template: %w", err)
+	}
+	out.WriteByte('\n')
+	return out.String(), nil
 }
 
 func resolveShortcutIcon(ctx context.Context, manifestPath string, icon workspace.WSLDIcon) (string, []byte, error) {

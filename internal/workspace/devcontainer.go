@@ -39,6 +39,7 @@ type DevcontainerWSLB struct {
 	DefaultUser    *WSLDefaultUser        `json:"defaultUser,omitempty"`
 	State          *WSLStateConfig        `json:"state,omitempty"`
 	WSLConf        *WSLConfConfig         `json:"wslconf,omitempty"`
+	WSLConfig      *WSLGlobalConfig       `json:"wslconfig,omitempty"`
 	Distribution   *WSLDistributionConfig `json:"distribution,omitempty"`
 	Tags           []string               `json:"tags,omitempty"`
 	FeatureSources []FeatureSource        `json:"featureSources,omitempty"`
@@ -164,6 +165,10 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 	if wslb != nil && len(wslb.FeatureSources) > 0 {
 		featureSources = wslb.FeatureSources
 	}
+	var wslGlobalConfig *WSLGlobalConfig
+	if wslb != nil {
+		wslGlobalConfig = wslb.WSLConfig
+	}
 
 	return &Manifest{
 		Version: 1,
@@ -187,6 +192,7 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 					DefaultUser:  defaultUser,
 					State:        state,
 					WSLConf:      wslconf,
+					WSLConfig:    wslGlobalConfig,
 					Distribution: normalizeDistribution(wslb, defaultUser),
 					Features:     features,
 				},

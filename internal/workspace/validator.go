@@ -93,6 +93,32 @@ func Validate(m *Manifest, manifestPath string) ValidationResult {
 					issues = append(issues, ValidationIssue{Path: prefix + ".wsl.state.fsLabel", Code: "WSLB_WSL_STATE_FSLABEL_REQUIRED", Message: "fsLabel is required for vhdx mode"})
 				}
 			}
+			if img.WSL.WSLConfig != nil {
+				if img.WSL.WSLConfig.WSL2 != nil {
+					for key, value := range img.WSL.WSLConfig.WSL2 {
+						if !isScalarConfigValue(value) {
+							issues = append(issues, ValidationIssue{
+								Path:        fmt.Sprintf("%s.wsl.wslconfig.wsl2.%s", prefix, key),
+								Code:        "WSLB_WSLCONFIG_VALUE_INVALID",
+								Message:     "wslconfig.wsl2 values must be string/number/boolean",
+								Remediation: "replace nested objects/arrays with scalar values",
+							})
+						}
+					}
+				}
+				if img.WSL.WSLConfig.Experimental != nil {
+					for key, value := range img.WSL.WSLConfig.Experimental {
+						if !isScalarConfigValue(value) {
+							issues = append(issues, ValidationIssue{
+								Path:        fmt.Sprintf("%s.wsl.wslconfig.experimental.%s", prefix, key),
+								Code:        "WSLB_WSLCONFIG_VALUE_INVALID",
+								Message:     "wslconfig.experimental values must be string/number/boolean",
+								Remediation: "replace nested objects/arrays with scalar values",
+							})
+						}
+					}
+				}
+			}
 			for j, f := range img.WSL.Features {
 				if strings.TrimSpace(f.Ref) == "" {
 					issues = append(issues, ValidationIssue{Path: fmt.Sprintf("%s.wsl.features[%d].ref", prefix, j), Code: "WSLB_FEATURE_REF_REQUIRED", Message: "feature ref is required"})
@@ -143,4 +169,13 @@ func Validate(m *Manifest, manifestPath string) ValidationResult {
 	}
 
 	return ValidationResult{Valid: len(issues) == 0, Issues: issues}
+}
+
+func isScalarConfigValue(v interface{}) bool {
+	switch v.(type) {
+	case string, bool, float64, float32, int, int32, int64, uint, uint32, uint64:
+		return true
+	default:
+		return false
+	}
 }

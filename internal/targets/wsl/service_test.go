@@ -86,6 +86,70 @@ func TestRenderWSLConfSections(t *testing.T) {
 	}
 }
 
+func TestRenderWSLConfAdditionalSections(t *testing.T) {
+	trueVal := true
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			DefaultUser: workspace.WSLDefaultUser{Name: "dev"},
+			WSLConf: workspace.WSLConfConfig{
+				User: &workspace.WSLConfUser{Default: "dev"},
+				Boot: &workspace.WSLConfBoot{
+					Systemd:       &trueVal,
+					ProtectBinfmt: &trueVal,
+				},
+				Automount: &workspace.WSLConfAutomount{
+					Enabled:     &trueVal,
+					MountFsTab:  &trueVal,
+					CrossDistro: &trueVal,
+				},
+				GPU:  &workspace.WSLConfGPU{Enabled: &trueVal},
+				Time: &workspace.WSLConfTime{UseWindowsTimezone: &trueVal},
+			},
+		},
+	}
+	conf := renderWSLConf(image)
+	required := []string{
+		"protectBinfmt=true",
+		"crossDistro=true",
+		"[gpu]",
+		"[time]",
+		"useWindowsTimezone=true",
+	}
+	for _, token := range required {
+		if !strings.Contains(conf, token) {
+			t.Fatalf("renderWSLConf missing %q in:\n%s", token, conf)
+		}
+	}
+}
+
+func TestRenderGlobalWSLConfig(t *testing.T) {
+	cfg := workspace.WSLGlobalConfig{
+		WSL2: map[string]interface{}{
+			"memory":     "4GB",
+			"processors": float64(2),
+		},
+		Experimental: map[string]interface{}{
+			"sparseVhd": true,
+		},
+	}
+	out, err := renderGlobalWSLConfig(cfg)
+	if err != nil {
+		t.Fatalf("renderGlobalWSLConfig() error = %v", err)
+	}
+	required := []string{
+		"[wsl2]",
+		"memory=4GB",
+		"processors=2",
+		"[experimental]",
+		"sparseVhd=true",
+	}
+	for _, token := range required {
+		if !strings.Contains(out, token) {
+			t.Fatalf("renderGlobalWSLConfig missing %q in:\n%s", token, out)
+		}
+	}
+}
+
 func TestManagedUserHome(t *testing.T) {
 	cases := []struct {
 		mount string

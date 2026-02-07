@@ -33,11 +33,16 @@
 - Microsoft custom distro docs also define `/etc/wsl-distribution.conf` for first-launch behavior and shortcut metadata:
   - `[oobe] command=...`
   - `[shortcut] enabled=true|false` and `icon=<path-to-ico>`
+  - `[windowsterminal] enabled=...` and `ProfileTemplate=<path>`
   - https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro
 - Disk/VHD mount behavior and admin requirement for `wsl --mount` are documented by Microsoft.
   - https://learn.microsoft.com/en-us/windows/wsl/wsl2-mount-disk
 - `wsl.conf` behavior (`[user] default=...`, systemd on `[boot]`) and restart/shutdown requirements are documented by Microsoft.
   - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+- Advanced per-distro `wsl.conf` sections and keys (`[automount]`, `[network]`, `[interop]`, `[user]`, `[boot]`, `[gpu]`, `[time]`) are documented by Microsoft.
+  - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+- Custom distro `windowsterminal.ProfileTemplate` in `/etc/wsl-distribution.conf` is documented by Microsoft.
+  - https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro
 
 ### Dev Container Features
 
@@ -60,8 +65,8 @@
 - Simple Icons publishes icon slugs and SVG assets:
   - https://simpleicons.org
 - Reliable machine-readable SVG fetch endpoint used in implementation:
-  - `https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/<slug>.svg`
-  - https://www.jsdelivr.com/package/npm/simple-icons
+  - `https://simpleicons.org/icons/<slug>.svg`
+  - https://simpleicons.org
 
 ## 4) Key Design Decisions
 
@@ -90,6 +95,10 @@
 - `distribution.shortcut.icon` supports:
   - direct `.ico` path/URL
   - Simple Icons slug (`simpleIcon`) with optional `color` and `style` (`flat` default, `badge` optional); `wslb` fetches SVG and converts to `.ico`.
+- `distribution.windowsterminal` supports both section-style and devcontainer-friendly input:
+  - canonical `windowsterminal` key
+  - alias `windowsTerminal` key
+  - `profileTemplate` path or inline/file-backed `template` JSON payload
 - Icon/start-menu reliability updates:
   - distro metadata (`/etc/wsl-distribution.conf`) and icon are now embedded into the built rootfs before install.
   - install prefers `wsl --install --from-file` so WSL applies custom-distro metadata at install time.

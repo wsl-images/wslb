@@ -26,6 +26,9 @@
           "color": "E95420",
           "style": "flat"
         }
+      },
+      "windowsterminal": {
+        "enabled": true
       }
     }
   }

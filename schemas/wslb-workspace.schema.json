@@ -1,8 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
-  "title": "wslb Devcontainer Superset",
-  "description": "Convention-first devcontainer.json/jsonc superset for wslb (WSL-only).",
+  "title": "wslb Devcontainer Superset (WSL-only)",
+  "description": "devcontainer.json/jsonc schema for wslb WSL distro build/install/upgrade management.",
+  "markdownDescription": "Use this in `devcontainer.json` or `devcontainer.jsonc`:\n\n```jsonc\n{\n  \"$schema\": \"https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json\"\n}\n```\n\n`wslb` is WSL-only, so most config is convention-first:\n- target defaults to `wsl`\n- image id defaults from `wslb.id`/`wslb.imageId`/`wslb.distroName`/`name`\n- outputDir defaults to `./.wslb-out`\n- installDir defaults to `<outputDir>/distros/<distroName>`\n- user defaults from `remoteUser` / `containerUser` / `dev`",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -11,27 +12,27 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "Optional schema association URL for editor IntelliSense."
+      "description": "Schema association URL for editor IntelliSense/validation."
     },
     "name": {
       "type": "string",
-      "description": "Display name used for defaults."
+      "description": "Display name; also used for defaults when wslb fields are omitted."
     },
     "image": {
       "type": "string",
-      "description": "Base OCI image reference for the distro rootfs."
+      "description": "Base OCI image reference used to build the WSL rootfs (for example ubuntu:24.04)."
     },
     "remoteUser": {
       "type": "string",
-      "description": "Preferred user name; used as default WSL user unless overridden."
+      "description": "Preferred Linux user in devcontainer and WSL."
     },
     "containerUser": {
       "type": "string",
-      "description": "Fallback user name if remoteUser is omitted."
+      "description": "Fallback user if remoteUser is omitted."
     },
     "features": {
       "type": "object",
-      "description": "Dev Container features plus wslb internal features.",
+      "description": "Dev Container Features map. Keys are feature refs; value may be object, boolean, or null.",
       "additionalProperties": {
         "oneOf": [
           {
@@ -48,29 +49,70 @@
       }
     },
     "wslb": {
+      "$ref": "#/$defs/wslb"
+    }
+  },
+  "$defs": {
+    "wslb": {
       "type": "object",
       "additionalProperties": true,
-      "description": "WSL lifecycle extension.",
+      "description": "WSL lifecycle extension block.",
       "properties": {
         "version": {
           "type": "integer",
-          "const": 1
+          "const": 1,
+          "description": "Schema version for wslb extension."
         },
         "id": {
           "type": "string",
-          "description": "Optional explicit image id. Preferred over legacy imageId."
+          "description": "Primary image id."
         },
         "imageId": {
           "type": "string",
-          "description": "Legacy alias for id."
+          "description": "Legacy alias of id."
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "wsl"
+          ],
+          "description": "Legacy field. wslb only supports WSL."
+        },
+        "workspaceName": {
+          "type": "string",
+          "description": "Optional override; defaults from top-level name."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Friendly name for UI/plan output."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable image description."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional tags for metadata output."
+        },
+        "outputDir": {
+          "type": "string",
+          "description": "Workspace output dir. Default: ./.wslb-out"
         },
         "distroName": {
           "type": "string",
-          "description": "WSL registered distro name."
+          "description": "Registered WSL distro name."
+        },
+        "installDir": {
+          "type": "string",
+          "description": "Install location used by wsl --import/--install. Default: <outputDir>/distros/<distroName>."
         },
         "managed": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Enable managed mode (state split + safe upgrade/rollback flow)."
         },
         "user": {
           "$ref": "#/$defs/user"
@@ -85,47 +127,18 @@
         "wslconf": {
           "$ref": "#/$defs/wslconf"
         },
+        "wslconfig": {
+          "$ref": "#/$defs/wslconfig"
+        },
         "distribution": {
           "$ref": "#/$defs/distribution"
-        },
-        "outputDir": {
-          "type": "string",
-          "description": "Optional override. Default: ./.wslb-out"
-        },
-        "installDir": {
-          "type": "string",
-          "description": "Optional override. Default: <outputDir>/distros/<distroName>"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "workspaceName": {
-          "type": "string",
-          "description": "Optional override; normally inferred from name."
-        },
-        "target": {
-          "type": "string",
-          "enum": [
-            "wsl"
-          ],
-          "description": "Optional legacy field. wslb is WSL-only."
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
-    }
-  },
-  "$defs": {
+    },
     "user": {
       "type": "object",
       "additionalProperties": false,
+      "description": "WSL default user to create/configure.",
       "properties": {
         "name": {
           "type": "string"
@@ -145,6 +158,7 @@
     "state": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Externalized persistent state location used for managed mode.",
       "properties": {
         "mode": {
           "type": "string",
@@ -155,21 +169,26 @@
           "default": "windows-dir"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Path to state VHDX or Windows directory."
         },
         "mountPoint": {
           "type": "string",
-          "default": "/home"
+          "default": "/home",
+          "description": "Linux mount destination for external state."
         },
         "fsLabel": {
           "type": "string",
-          "default": "WSLB_STATE"
+          "default": "WSLB_STATE",
+          "description": "Required for vhdx mode; mounted under /mnt/wsl/<fsLabel>."
         }
       }
     },
     "wslconf": {
       "type": "object",
       "additionalProperties": true,
+      "description": "Per-distro /etc/wsl.conf settings. This mirrors Microsoft wsl.conf sections.",
+      "markdownDescription": "Maps to `/etc/wsl.conf`. Supported sections/keys include:\n- `[user] default`\n- `[boot] systemd, command, protectBinfmt`\n- `[automount] enabled, root, options, mountFsTab, crossDistro`\n- `[network] hostname, generateHosts, generateResolvConf`\n- `[interop] enabled, appendWindowsPath`\n- `[gpu] enabled`\n- `[time] useWindowsTimezone`\n\nLegacy shortcuts are also supported:\n- `wslconf.systemd` -> `wslconf.boot.systemd`\n- `wslconf.automount: true|false` -> `wslconf.automount.enabled`",
       "properties": {
         "systemd": {
           "type": "boolean",
@@ -182,131 +201,325 @@
               "description": "Legacy shorthand for automount.enabled."
             },
             {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "root": {
-                  "type": "string"
-                },
-                "options": {
-                  "type": "string"
-                },
-                "mountFsTab": {
-                  "type": "boolean"
-                }
-              }
+              "$ref": "#/$defs/wslconf_automount"
             }
           ]
         },
         "user": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "default": {
-              "type": "string"
-            }
-          }
+          "$ref": "#/$defs/wslconf_user"
         },
         "boot": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "systemd": {
-              "type": "boolean"
-            },
-            "command": {
-              "type": "string"
-            }
-          }
+          "$ref": "#/$defs/wslconf_boot"
         },
         "network": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "hostname": {
-              "type": "string"
-            },
-            "generateHosts": {
-              "type": "boolean"
-            },
-            "generateResolvConf": {
-              "type": "boolean"
-            }
-          }
+          "$ref": "#/$defs/wslconf_network"
         },
         "interop": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "appendWindowsPath": {
-              "type": "boolean"
-            }
-          }
+          "$ref": "#/$defs/wslconf_interop"
+        },
+        "gpu": {
+          "$ref": "#/$defs/wslconf_gpu"
+        },
+        "time": {
+          "$ref": "#/$defs/wslconf_time"
         }
+      }
+    },
+    "wslconf_user": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string",
+          "description": "Default Linux username when launching distro."
+        }
+      }
+    },
+    "wslconf_boot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "systemd": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command executed on distro startup."
+        },
+        "protectBinfmt": {
+          "type": "boolean",
+          "description": "WSL boot option for binfmt handling."
+        }
+      }
+    },
+    "wslconf_automount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "root": {
+          "type": "string"
+        },
+        "options": {
+          "type": "string",
+          "description": "DrvFs mount options string."
+        },
+        "mountFsTab": {
+          "type": "boolean"
+        },
+        "crossDistro": {
+          "type": "boolean"
+        }
+      }
+    },
+    "wslconf_network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hostname": {
+          "type": "string"
+        },
+        "generateHosts": {
+          "type": "boolean"
+        },
+        "generateResolvConf": {
+          "type": "boolean"
+        }
+      }
+    },
+    "wslconf_interop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "appendWindowsPath": {
+          "type": "boolean"
+        }
+      }
+    },
+    "wslconf_gpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "wslconf_time": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "useWindowsTimezone": {
+          "type": "boolean"
+        }
+      }
+    },
+    "wslconfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional global %USERPROFILE%/.wslconfig writer.",
+      "markdownDescription": "Use this to manage global WSL VM settings from devcontainer config.\n\n`wslb` writes `%USERPROFILE%/.wslconfig` and runs `wsl --shutdown` when values change.\n\nSupported as pass-through maps:\n- `wslconfig.wsl2`\n- `wslconfig.experimental`\n\nValues must be scalar (`string`, `number`, or `boolean`).",
+      "properties": {
+        "apply": {
+          "type": "boolean",
+          "default": true,
+          "description": "When false, ignore wslconfig payload without writing host .wslconfig."
+        },
+        "wsl2": {
+          "$ref": "#/$defs/wslglobal_map"
+        },
+        "experimental": {
+          "$ref": "#/$defs/wslglobal_map"
+        }
+      }
+    },
+    "wslglobal_map": {
+      "type": "object",
+      "description": "Map of .wslconfig keys to scalar values.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
       }
     },
     "distribution": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Settings written to /etc/wsl-distribution.conf.",
       "properties": {
         "oobe": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "defaultName": {
-              "type": "string"
-            },
-            "defaultUid": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "command": {
-              "type": "string"
-            }
-          }
+          "$ref": "#/$defs/distribution_oobe"
         },
         "shortcut": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean"
+          "$ref": "#/$defs/distribution_shortcut"
+        },
+        "windowsterminal": {
+          "$ref": "#/$defs/distribution_windowsterminal"
+        },
+        "windowsTerminal": {
+          "$ref": "#/$defs/distribution_windowsterminal",
+          "description": "Alias for windowsterminal (camelCase-friendly for devcontainer.json). Use only one."
+        }
+      }
+    },
+    "distribution_oobe": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OOBE block for custom distro first-run behavior.",
+      "properties": {
+        "defaultName": {
+          "type": "string"
+        },
+        "defaultUid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "command": {
+          "type": "string"
+        }
+      }
+    },
+    "distribution_shortcut": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "icon": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Path or URL to .ico/.svg/.png/.jpg."
             },
+            {
+              "$ref": "#/$defs/distribution_icon"
+            }
+          ]
+        }
+      }
+    },
+    "distribution_icon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path or URL to icon file."
+        },
+        "simpleIcon": {
+          "type": "string",
+          "description": "Simple Icons slug (for example ubuntu, docker, github)."
+        },
+        "color": {
+          "type": "string",
+          "description": "Optional hex color override, e.g. E95420 or #E95420."
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "flat",
+            "badge"
+          ],
+          "description": "Render style for simpleIcon source."
+        }
+      }
+    },
+    "distribution_windowsterminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Controls [windowsterminal] section in /etc/wsl-distribution.conf.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "profileTemplate": {
+          "type": "string",
+          "description": "Path inside distro to terminal profile template JSON."
+        },
+        "template": {
+          "$ref": "#/$defs/distribution_windowsterminal_template",
+          "description": "Terminal profile template content as inline JSON object or a file path string."
+        },
+        "templateJson": {
+          "$ref": "#/$defs/distribution_windowsterminal_template",
+          "description": "Alias for template."
+        }
+      }
+    },
+    "distribution_windowsterminal_template": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": true
+        },
+        {
+          "type": "string",
+          "description": "Path to a JSON file that contains Windows Terminal profile template content."
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
+      "name": "Ubuntu Dev",
+      "image": "ubuntu:24.04",
+      "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+      },
+      "remoteUser": "dev",
+      "wslb": {
+        "distroName": "UbuntuDev",
+        "managed": true,
+        "state": {
+          "mode": "windows-dir"
+        },
+        "wslconf": {
+          "boot": {
+            "systemd": true
+          },
+          "automount": {
+            "enabled": true,
+            "mountFsTab": true
+          },
+          "interop": {
+            "enabled": true,
+            "appendWindowsPath": true
+          }
+        },
+        "distribution": {
+          "oobe": {
+            "defaultName": "dev"
+          },
+          "shortcut": {
+            "enabled": true,
             "icon": {
-              "oneOf": [
+              "simpleIcon": "ubuntu",
+              "color": "E95420",
+              "style": "flat"
+            }
+          },
+          "windowsterminal": {
+            "enabled": true,
+            "template": {
+              "profiles": [
                 {
-                  "type": "string",
-                  "description": "Path or URL to an icon file (ico/svg/png/jpg)."
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "path": {
-                      "type": "string"
-                    },
-                    "simpleIcon": {
-                      "type": "string",
-                      "description": "Simple Icons slug, e.g. ubuntu, docker."
-                    },
-                    "color": {
-                      "type": "string",
-                      "description": "Optional hex color override."
-                    },
-                    "style": {
-                      "type": "string",
-                      "enum": [
-                        "flat",
-                        "badge"
-                      ],
-                      "description": "Icon rendering style. Defaults to flat."
-                    }
+                  "font": {
+                    "face": "Cascadia Mono"
                   }
                 }
               ]
@@ -315,7 +528,5 @@
         }
       }
     }
-  }
+  ]
 }
-
-

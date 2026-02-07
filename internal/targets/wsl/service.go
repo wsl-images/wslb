@@ -300,6 +300,9 @@ func configureWSLForDistro(ctx context.Context, manifestPath string, image works
 	if image.WSL == nil {
 		return nil
 	}
+	if err := applyGlobalWSLConfig(ctx, image); err != nil {
+		return err
+	}
 	if err := ensureDistroDefaultUser(ctx, image, distro); err != nil {
 		return err
 	}
@@ -372,6 +375,9 @@ func renderWSLConf(image workspace.Image) string {
 	if strings.TrimSpace(cfg.Boot.Command) != "" {
 		b.WriteString("command=" + cfg.Boot.Command + "\n")
 	}
+	if cfg.Boot.ProtectBinfmt != nil {
+		b.WriteString("protectBinfmt=" + boolToString(*cfg.Boot.ProtectBinfmt) + "\n")
+	}
 	b.WriteString("[automount]\n")
 	b.WriteString("enabled=" + boolToString(*cfg.Automount.Enabled) + "\n")
 	b.WriteString("mountFsTab=" + boolToString(*cfg.Automount.MountFsTab) + "\n")
@@ -380,6 +386,9 @@ func renderWSLConf(image workspace.Image) string {
 	}
 	if strings.TrimSpace(cfg.Automount.Options) != "" {
 		b.WriteString("options=" + cfg.Automount.Options + "\n")
+	}
+	if cfg.Automount.CrossDistro != nil {
+		b.WriteString("crossDistro=" + boolToString(*cfg.Automount.CrossDistro) + "\n")
 	}
 	if cfg.Network != nil {
 		if strings.TrimSpace(cfg.Network.Hostname) != "" || cfg.Network.GenerateHosts != nil || cfg.Network.GenerateResolvConf != nil {
@@ -406,7 +415,122 @@ func renderWSLConf(image workspace.Image) string {
 			}
 		}
 	}
+	if cfg.GPU != nil && cfg.GPU.Enabled != nil {
+		b.WriteString("[gpu]\n")
+		b.WriteString("enabled=" + boolToString(*cfg.GPU.Enabled) + "\n")
+	}
+	if cfg.Time != nil && cfg.Time.UseWindowsTimezone != nil {
+		b.WriteString("[time]\n")
+		b.WriteString("useWindowsTimezone=" + boolToString(*cfg.Time.UseWindowsTimezone) + "\n")
+	}
 	return b.String()
+}
+
+func applyGlobalWSLConfig(ctx context.Context, image workspace.Image) error {
+	if image.WSL == nil || image.WSL.WSLConfig == nil {
+		return nil
+	}
+	cfg := image.WSL.WSLConfig
+	if cfg.Apply != nil && !*cfg.Apply {
+		return nil
+	}
+	if len(cfg.WSL2) == 0 && len(cfg.Experimental) == 0 {
+		return nil
+	}
+
+	userProfile := strings.TrimSpace(os.Getenv("USERPROFILE"))
+	if userProfile == "" {
+		return fmt.Errorf("USERPROFILE is required to apply .wslconfig")
+	}
+	targetPath := filepath.Join(userProfile, ".wslconfig")
+
+	rendered, err := renderGlobalWSLConfig(*cfg)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(rendered) == "" {
+		return nil
+	}
+
+	existing, readErr := os.ReadFile(targetPath)
+	if readErr == nil && strings.TrimSpace(string(existing)) == strings.TrimSpace(rendered) {
+		return nil
+	}
+	if readErr == nil {
+		backupPath := targetPath + ".wslb.bak"
+		_ = os.WriteFile(backupPath, existing, 0o644)
+	}
+	if err := os.WriteFile(targetPath, []byte(rendered), 0o644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", targetPath, err)
+	}
+	if _, err := runCombined(ctx, "wsl", "--shutdown"); err != nil {
+		return fmt.Errorf("updated .wslconfig but failed to restart WSL VM: %w", err)
+	}
+	return nil
+}
+
+func renderGlobalWSLConfig(cfg workspace.WSLGlobalConfig) (string, error) {
+	var b strings.Builder
+	writeSection := func(name string, kv map[string]interface{}) error {
+		if len(kv) == 0 {
+			return nil
+		}
+		keys := make([]string, 0, len(kv))
+		for k := range kv {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteString("[" + name + "]\n")
+		for _, k := range keys {
+			v := kv[k]
+			if v == nil {
+				continue
+			}
+			rendered, err := renderWSLGlobalValue(v)
+			if err != nil {
+				return fmt.Errorf(".wslconfig %s.%s: %w", name, k, err)
+			}
+			b.WriteString(k + "=" + rendered + "\n")
+		}
+		b.WriteString("\n")
+		return nil
+	}
+	if err := writeSection("wsl2", cfg.WSL2); err != nil {
+		return "", err
+	}
+	if err := writeSection("experimental", cfg.Experimental); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(b.String()) + "\n", nil
+}
+
+func renderWSLGlobalValue(v interface{}) (string, error) {
+	switch t := v.(type) {
+	case bool:
+		return boolToString(t), nil
+	case string:
+		return t, nil
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64), nil
+	case float32:
+		return strconv.FormatFloat(float64(t), 'f', -1, 32), nil
+	case int:
+		return strconv.Itoa(t), nil
+	case int64:
+		return strconv.FormatInt(t, 10), nil
+	case int32:
+		return strconv.FormatInt(int64(t), 10), nil
+	case uint:
+		return strconv.FormatUint(uint64(t), 10), nil
+	case uint64:
+		return strconv.FormatUint(t, 10), nil
+	case uint32:
+		return strconv.FormatUint(uint64(t), 10), nil
+	case json.Number:
+		return t.String(), nil
+	default:
+		return "", fmt.Errorf("unsupported value type %T (use string/number/bool)", v)
+	}
 }
 
 func ensureDistroDefaultUser(ctx context.Context, image workspace.Image, distro string) error {

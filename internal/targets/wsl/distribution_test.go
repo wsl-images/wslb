@@ -2,6 +2,7 @@ package wsl
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"image"
@@ -154,6 +155,90 @@ func TestTintRasterImage(t *testing.T) {
 	}
 	if c1.R != 233 || c1.G != 84 || c1.B != 32 || c1.A != 128 {
 		t.Fatalf("unexpected tinted pixel 1: %#v", c1)
+	}
+}
+
+func TestResolveDistributionAssetsWindowsterminalConfig(t *testing.T) {
+	trueVal := true
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			Distribution: &workspace.WSLDistributionConfig{
+				WindowsTerminal: &workspace.WSLDistributionWindowsTerminal{
+					Enabled:         &trueVal,
+					ProfileTemplate: "/usr/lib/wsl/custom-terminal-profile.json",
+				},
+			},
+		},
+	}
+	assets, err := resolveDistributionAssets(context.Background(), "C:\\repo\\devcontainer.json", image)
+	if err != nil {
+		t.Fatalf("resolveDistributionAssets() error = %v", err)
+	}
+	if !strings.Contains(assets.Conf, "[windowsterminal]") {
+		t.Fatalf("expected [windowsterminal] section in conf:\n%s", assets.Conf)
+	}
+	if !strings.Contains(assets.Conf, "enabled=true") {
+		t.Fatalf("expected enabled=true in conf:\n%s", assets.Conf)
+	}
+	if !strings.Contains(assets.Conf, "ProfileTemplate=/usr/lib/wsl/custom-terminal-profile.json") {
+		t.Fatalf("expected custom ProfileTemplate in conf:\n%s", assets.Conf)
+	}
+	if strings.TrimSpace(assets.WTProfileTemplateJSON) != "" {
+		t.Fatalf("expected no auto-generated profile template when custom template is provided")
+	}
+}
+
+func TestResolveDistributionAssetsWindowsterminalInlineTemplate(t *testing.T) {
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			Distribution: &workspace.WSLDistributionConfig{
+				WindowsTerminal: &workspace.WSLDistributionWindowsTerminal{
+					Template: []byte(`{"profiles":[{"name":"WSLB","hidden":false}]}`),
+				},
+			},
+		},
+	}
+	assets, err := resolveDistributionAssets(context.Background(), "C:\\repo\\devcontainer.json", image)
+	if err != nil {
+		t.Fatalf("resolveDistributionAssets() error = %v", err)
+	}
+	if !strings.Contains(assets.Conf, "[windowsterminal]") {
+		t.Fatalf("expected [windowsterminal] section in conf:\n%s", assets.Conf)
+	}
+	if !strings.Contains(assets.Conf, "ProfileTemplate="+defaultWTProfilePath) {
+		t.Fatalf("expected default profile template path in conf:\n%s", assets.Conf)
+	}
+	if !strings.Contains(assets.WTProfileTemplateJSON, `"profiles"`) {
+		t.Fatalf("expected template JSON to be rendered, got:\n%s", assets.WTProfileTemplateJSON)
+	}
+}
+
+func TestResolveDistributionAssetsWindowsterminalTemplatePath(t *testing.T) {
+	tmp := t.TempDir()
+	manifestPath := filepath.Join(tmp, "devcontainer.json")
+	templatePath := filepath.Join(tmp, "wt-profile.json")
+	if err := os.WriteFile(templatePath, []byte(`{"profiles":[{"name":"FromFile"}]}`), 0o644); err != nil {
+		t.Fatalf("write template file: %v", err)
+	}
+
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			Distribution: &workspace.WSLDistributionConfig{
+				WindowsTerminal: &workspace.WSLDistributionWindowsTerminal{
+					Template: []byte(`"wt-profile.json"`),
+				},
+			},
+		},
+	}
+	assets, err := resolveDistributionAssets(context.Background(), manifestPath, image)
+	if err != nil {
+		t.Fatalf("resolveDistributionAssets() error = %v", err)
+	}
+	if !strings.Contains(assets.WTProfileTemplateJSON, `"FromFile"`) {
+		t.Fatalf("expected file template JSON to be loaded, got:\n%s", assets.WTProfileTemplateJSON)
+	}
+	if assets.WTProfileTemplatePath != defaultWTProfilePath {
+		t.Fatalf("expected default WT profile path %q, got %q", defaultWTProfilePath, assets.WTProfileTemplatePath)
 	}
 }
 
