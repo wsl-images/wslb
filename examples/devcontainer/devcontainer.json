@@ -1,0 +1,89 @@
+{
+  "name": "WSLB Ubuntu Superset",
+  "image": "ubuntu:24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "dev",
+      "installZsh": "true",
+      "upgradePackages": "false"
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.24"
+    },
+    "wslb:feature/first-boot-user": {
+      "USERNAME": "dev",
+      "USER_UID": "1000",
+      "USER_GID": "1000",
+      "HOME": "/home/dev"
+    },
+    "wslb:feature/persist-home": {
+      "MOUNT_POINT": "/home",
+      "SYSTEMD": "true"
+    }
+  },
+  "remoteUser": "dev",
+  "wslb": {
+    "version": 1,
+    "workspaceName": "wslb-devcontainer-superset",
+    "imageId": "ubuntu-devcontainer",
+    "target": "wsl",
+    "displayName": "Ubuntu Devcontainer WSL",
+    "description": "Dev Container superset resolved by wslb into managed WSL lifecycle",
+    "distroName": "UbuntuDevcontainer",
+    "managed": true,
+    "outputDir": "./.wslb-out",
+    "installDir": "./distros/ubuntu-devcontainer",
+    "state": {
+      "mode": "windows-dir",
+      "path": "./state/ubuntu-devcontainer-home",
+      "mountPoint": "/home",
+      "fsLabel": "WSLB_STATE"
+    },
+    "wslconf": {
+      "user": {
+        "default": "dev"
+      },
+      "boot": {
+        "systemd": true
+      },
+      "automount": {
+        "enabled": true,
+        "mountFsTab": true,
+        "options": "metadata,umask=022"
+      },
+      "network": {
+        "hostname": "ubuntu-devcontainer",
+        "generateHosts": true,
+        "generateResolvConf": true
+      },
+      "interop": {
+        "enabled": true,
+        "appendWindowsPath": true
+      }
+    },
+    "distribution": {
+      "oobe": {
+        "command": "usermod --shell /bin/bash dev"
+      },
+      "shortcut": {
+        "enabled": true,
+        "icon": {
+          "simpleIcon": "ubuntu",
+          "color": "E95420"
+        }
+      }
+    },
+    "tags": [
+      "latest",
+      "dev"
+    ]
+  }
+}

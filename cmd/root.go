@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/wsl-images/wslb/internal/app"
 	"github.com/wsl-images/wslb/internal/logger"
 	"os"
 	"path/filepath"
@@ -9,11 +10,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile   string
+	jsonOut   bool
+	ndjsonOut bool
+	services  *app.Services
+)
 
 var rootCmd = &cobra.Command{
-	Use:   "wslb",
-	Short: "Build and install WSL distributions from Docker images",
+	Use:          "wslb",
+	Short:        "Build and manage WSL workspace images",
+	SilenceUsage: true,
 }
 
 func Execute() {
@@ -26,6 +33,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wslb/wslb.yaml)")
+	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
+	rootCmd.PersistentFlags().BoolVar(&ndjsonOut, "ndjson", false, "stream NDJSON progress events")
 }
 
 func initConfig() {
@@ -37,9 +46,8 @@ func initConfig() {
 			logger.Fatal("Unable to determine home directory: ", err)
 		}
 
-		// Create the .wslb directory if it doesn't exist
 		configDir := filepath.Join(home, ".wslb")
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
 			logger.Fatal("Unable to create config directory: ", err)
 		}
 
@@ -51,4 +59,11 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		logger.Info("Using config file: ", viper.ConfigFileUsed())
 	}
+}
+
+func getServices() *app.Services {
+	if services == nil {
+		services = app.NewServices()
+	}
+	return services
 }

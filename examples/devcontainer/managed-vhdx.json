@@ -1,0 +1,51 @@
+{
+  "name": "WSLB Managed VHDX",
+  "image": "ubuntu:24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "wslb:feature/persist-home": {
+      "MOUNT_POINT": "/home"
+    }
+  },
+  "remoteUser": "dev",
+  "wslb": {
+    "version": 1,
+    "workspaceName": "wslb-managed-vhdx",
+    "imageId": "managed-vhdx",
+    "target": "wsl",
+    "displayName": "Managed VHDX Ubuntu",
+    "description": "Managed WSL image using external VHDX state",
+    "distroName": "ManagedVHDX",
+    "managed": true,
+    "outputDir": "./.wslb-out",
+    "installDir": "./distros/managed-vhdx",
+    "state": {
+      "mode": "vhdx",
+      "path": "./state/managed-vhdx.vhdx",
+      "mountPoint": "/home",
+      "fsLabel": "WSLB_STATE"
+    },
+    "wslconf": {
+      "user": {
+        "default": "dev"
+      },
+      "boot": {
+        "systemd": true
+      },
+      "automount": {
+        "enabled": true,
+        "mountFsTab": true,
+        "options": "metadata"
+      }
+    },
+    "distribution": {
+      "shortcut": {
+        "enabled": true,
+        "icon": {
+          "simpleIcon": "ubuntu",
+          "color": "E95420"
+        }
+      }
+    }
+  }
+}

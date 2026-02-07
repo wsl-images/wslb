@@ -8,8 +8,15 @@
   "files": [
     "bin/"
   ],
+  "scripts": {
+    "ps-web-runner": "node tools/ps-web-runner/server.js",
+    "test:playwright": "npx playwright test -c tests/playwright/playwright.config.js"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
   }
 }

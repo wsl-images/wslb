@@ -1,0 +1,41 @@
+{
+  "name": "WSLB Minimal",
+  "image": "ubuntu:24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "remoteUser": "dev",
+  "wslb": {
+    "version": 1,
+    "workspaceName": "wslb-minimal",
+    "imageId": "ubuntu-minimal",
+    "target": "wsl",
+    "displayName": "Ubuntu Minimal",
+    "description": "Minimal WSL devcontainer superset example",
+    "distroName": "UbuntuMinimal",
+    "managed": false,
+    "outputDir": "./.wslb-out",
+    "installDir": "./distros/ubuntu-minimal",
+    "wslconf": {
+      "user": {
+        "default": "dev"
+      },
+      "boot": {
+        "systemd": true
+      },
+      "automount": {
+        "enabled": true,
+        "mountFsTab": true
+      }
+    },
+    "distribution": {
+      "shortcut": {
+        "enabled": true,
+        "icon": {
+          "simpleIcon": "ubuntu",
+          "color": "E95420"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "ok": true,
+  "startedAt": "2026-02-07T01:47:46.4649619Z",
+  "endedAt": "2026-02-07T01:48:32.9878588Z",
+  "workspace": "C:\\Users\\steve\\AppData\\Local\\Temp\\wslb-e2e-3738e4316598433282d57d2ffbcfad56\\wslb-workspace.yaml",
+  "steps": [
+    {
+      "name": "build-wslb",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:47:46.4725845Z",
+      "endedAt": "2026-02-07T01:47:48.5151061Z",
+      "message": ""
+    },
+    {
+      "name": "doctor",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:47:48.5218031Z",
+      "endedAt": "2026-02-07T01:47:52.6543914Z",
+      "message": ""
+    },
+    {
+      "name": "workspace-validate",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:47:52.6553966Z",
+      "endedAt": "2026-02-07T01:47:53.6827316Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-state-create",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:47:53.6927470Z",
+      "endedAt": "2026-02-07T01:47:54.7346911Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-install",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:47:54.7349720Z",
+      "endedAt": "2026-02-07T01:48:05.7591755Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-sentinel-write",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:05.7593927Z",
+      "endedAt": "2026-02-07T01:48:08.8381505Z",
+      "message": ""
+    },
+    {
+      "name": "workspace-mutate-feature",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:08.8383496Z",
+      "endedAt": "2026-02-07T01:48:08.8564616Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-upgrade",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:08.8566599Z",
+      "endedAt": "2026-02-07T01:48:26.8932231Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-sentinel-verify-after-upgrade",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:26.8934119Z",
+      "endedAt": "2026-02-07T01:48:27.9179612Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-find-previous-version",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:27.9181828Z",
+      "endedAt": "2026-02-07T01:48:27.9344441Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-rollback",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:27.9346380Z",
+      "endedAt": "2026-02-07T01:48:31.9620317Z",
+      "message": ""
+    },
+    {
+      "name": "wsl-sentinel-verify-after-rollback",
+      "status": "passed",
+      "critical": true,
+      "startedAt": "2026-02-07T01:48:31.9621903Z",
+      "endedAt": "2026-02-07T01:48:32.9877469Z",
+      "message": ""
+    }
+  ]
+}

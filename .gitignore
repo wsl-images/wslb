@@ -7,3 +7,10 @@ bin
 /installer/wslb-installer/obj/
 # Added by goreleaser init:
 dist/
+
+# Runtime artifacts from local example runs
+examples/devcontainer/.wslb-out/
+examples/devcontainer/distros/
+examples/devcontainer/state/
+
+node_modules/
