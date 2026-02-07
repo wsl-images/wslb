@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -554,21 +555,16 @@ func ensureDistroDefaultUser(ctx context.Context, image workspace.Image, distro 
 		homeBase = strings.TrimSpace(image.WSL.State.MountPoint)
 	}
 	home := managedUserHome(homeBase, u)
-	createCmd := fmt.Sprintf(
-		`set -eu; if ! getent group %d >/dev/null 2>&1; then groupadd -g %d %s || true; fi; if ! id -u %s >/dev/null 2>&1; then useradd -m -u %d -g %d -s /bin/bash %s || useradd -m -s /bin/bash %s || true; fi`,
-		gid, gid, shQuote(u),
-		shQuote(u), uid, gid, shQuote(u), shQuote(u),
+	cmdText := fmt.Sprintf(
+		`set -eu; u=%s; target_uid=%d; target_gid=%d; `+
+			`if ! getent group "$target_gid" >/dev/null 2>&1; then groupadd -g "$target_gid" "$u" || true; fi; `+
+			`if ! id -u "$u" >/dev/null 2>&1; then useradd -m -u "$target_uid" -g "$target_gid" -s /bin/bash "$u" || useradd -m -s /bin/bash "$u" || true; fi; `+
+			`uid="$(id -u "$u" 2>/dev/null || echo "$target_uid")"; gid="$(id -g "$u" 2>/dev/null || echo "$target_gid")"; `+
+			`mkdir -p %s; chown -R "$uid:$gid" %s || true`,
+		shQuote(u), uid, gid, shQuote(home), shQuote(home),
 	)
-	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", createCmd); err != nil {
+	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmdText); err != nil {
 		return fmt.Errorf("failed to ensure default user %s: %w", u, err)
-	}
-	actualUID, actualGID := resolveUserIDs(ctx, distro, workspace.WSLDefaultUser{Name: u, UID: uid, GID: gid})
-	homeCmd := fmt.Sprintf(
-		`set -eu; mkdir -p %s; chown -R %d:%d %s || true`,
-		shQuote(home), actualUID, actualGID, shQuote(home),
-	)
-	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", homeCmd); err != nil {
-		return fmt.Errorf("failed to fix ownership for %s: %w", home, err)
 	}
 	return nil
 }
@@ -583,9 +579,6 @@ func boolToString(v bool) string {
 func verifyDistro(ctx context.Context, image workspace.Image, distro string) (bool, error) {
 	if image.WSL == nil {
 		return false, fmt.Errorf("missing WSL config")
-	}
-	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", "id -u "+image.WSL.DefaultUser.Name); err != nil {
-		return false, err
 	}
 	if image.WSL.Managed && image.WSL.State != nil {
 		mp := image.WSL.State.MountPoint
@@ -657,7 +650,18 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 		dst = "/home"
 	}
 	dstEsc := strings.ReplaceAll(dst, " ", `\040`)
-	uid, gid := resolveUserIDs(ctx, distro, image.WSL.DefaultUser)
+	userName := strings.TrimSpace(image.WSL.DefaultUser.Name)
+	if userName == "" {
+		userName = "dev"
+	}
+	uid := image.WSL.DefaultUser.UID
+	gid := image.WSL.DefaultUser.GID
+	if uid == 0 {
+		uid = 1000
+	}
+	if gid == 0 {
+		gid = 1000
+	}
 
 	switch image.WSL.State.Mode {
 	case "windows-dir":
@@ -670,8 +674,14 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 		mountOpts := fmt.Sprintf("metadata,uid=%d,gid=%d", uid, gid)
 		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
-			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s drvfs %s 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount -t drvfs %q %q -o %s; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }; mkdir -p %q; chown %d:%d %q || true",
-			linuxSrc, windowsSrc, dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst, userHome, uid, gid, userHome,
+			`set -eu; if [ ! -d %q ]; then echo "state source does not exist: %s" >&2; exit 21; fi; `+
+				`u=%s; `+
+				`mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; `+
+				`echo '%s %s drvfs %s 0 0 # wslb-state' >> /etc/fstab; `+
+				`mountpoint -q %q || mount -a || mount -t drvfs %q %q -o %s; `+
+				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }; `+
+				`mkdir -p %q; chown %d:%d %q || true`,
+			linuxSrc, windowsSrc, shQuote(userName), dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst, userHome, uid, gid, userHome,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -685,8 +695,14 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 		srcEsc := strings.ReplaceAll(src, " ", `\040`)
 		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
-			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s none bind 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount --bind %q %q; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }; mkdir -p %q; chown %d:%d %q || true",
-			src, src, dst, srcEsc, dstEsc, dst, src, dst, dst, dst, userHome, uid, gid, userHome,
+			`set -eu; if [ ! -d %q ]; then echo "state source does not exist: %s" >&2; exit 21; fi; `+
+				`u=%s; `+
+				`mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; `+
+				`echo '%s %s none bind 0 0 # wslb-state' >> /etc/fstab; `+
+				`mountpoint -q %q || mount -a || mount --bind %q %q; `+
+				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }; `+
+				`mkdir -p %q; chown %d:%d %q || true`,
+			src, src, shQuote(userName), dst, srcEsc, dstEsc, dst, src, dst, dst, dst, userHome, uid, gid, userHome,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -711,6 +727,11 @@ func resolveManagedStateSource(ctx context.Context, distro string, image workspa
 	src := image.WSL.State.Path
 	if image.WSL.State.Mode != "windows-dir" {
 		return src, nil
+	}
+
+	// Fast path for drive-letter Windows paths.
+	if linuxPath, ok := windowsPathToLinuxDrive(src); ok {
+		return linuxPath, nil
 	}
 
 	// WSL argument parsing strips backslashes in Windows paths; convert to slash form before wslpath.
@@ -741,37 +762,28 @@ func managedUserHome(mountPoint, user string) string {
 	return strings.TrimRight(mp, "/") + "/" + u
 }
 
-func resolveUserIDs(ctx context.Context, distro string, user workspace.WSLDefaultUser) (int, int) {
-	uid := user.UID
-	gid := user.GID
-	if uid == 0 {
-		uid = 1000
-	}
-	if gid == 0 {
-		gid = 1000
-	}
-	name := strings.TrimSpace(user.Name)
-	if name == "" {
-		return uid, gid
-	}
-
-	outUID, errUID := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "id", "-u", name)
-	if errUID == nil {
-		if parsed, parseErr := strconv.Atoi(strings.TrimSpace(outUID)); parseErr == nil && parsed > 0 {
-			uid = parsed
-		}
-	}
-	outGID, errGID := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "id", "-g", name)
-	if errGID == nil {
-		if parsed, parseErr := strconv.Atoi(strings.TrimSpace(outGID)); parseErr == nil && parsed > 0 {
-			gid = parsed
-		}
-	}
-	return uid, gid
-}
-
 func windowsPathToWSLArg(path string) string {
 	return strings.ReplaceAll(path, "\\", "/")
+}
+
+var windowsDrivePathPattern = regexp.MustCompile(`(?i)^([a-z]):[\\/](.*)$`)
+
+func windowsPathToLinuxDrive(path string) (string, bool) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", false
+	}
+	normalized := strings.ReplaceAll(trimmed, "\\", "/")
+	m := windowsDrivePathPattern.FindStringSubmatch(normalized)
+	if len(m) != 3 {
+		return "", false
+	}
+	drive := strings.ToLower(m[1])
+	rest := strings.TrimLeft(m[2], "/")
+	if rest == "" {
+		return "/mnt/" + drive, true
+	}
+	return "/mnt/" + drive + "/" + rest, true
 }
 
 func createVHDX(path string) error {

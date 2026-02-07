@@ -17,6 +17,29 @@ func TestWindowsPathToWSLArg(t *testing.T) {
 	}
 }
 
+func TestWindowsPathToLinuxDrive(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+		ok   bool
+	}{
+		{in: `D:\code\wslb\examples\devcontainer\state`, want: "/mnt/d/code/wslb/examples/devcontainer/state", ok: true},
+		{in: `c:/Users/steve`, want: "/mnt/c/Users/steve", ok: true},
+		{in: `Z:\`, want: "/mnt/z", ok: true},
+		{in: `\\server\share\path`, want: "", ok: false},
+		{in: `/already/linux`, want: "", ok: false},
+	}
+	for _, c := range cases {
+		got, ok := windowsPathToLinuxDrive(c.in)
+		if ok != c.ok {
+			t.Fatalf("windowsPathToLinuxDrive(%q) ok=%v want=%v", c.in, ok, c.ok)
+		}
+		if got != c.want {
+			t.Fatalf("windowsPathToLinuxDrive(%q)=%q want=%q", c.in, got, c.want)
+		}
+	}
+}
+
 func TestExpectedFeatureTools(t *testing.T) {
 	image := workspace.Image{
 		WSL: &workspace.WSLImageConfig{
