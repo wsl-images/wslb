@@ -14,3 +14,7 @@ examples/devcontainer/distros/
 examples/devcontainer/state/
 
 node_modules/
+
+# Local binaries and scratch outputs
+/wslb.exe
+/.wslb-out/

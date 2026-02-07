@@ -43,6 +43,40 @@ func BuildArtifact(ctx context.Context, manifestPath string, image workspace.Ima
 	df.WriteString("SHELL [\"/bin/sh\", \"-c\"]\n")
 
 	if image.WSL != nil {
+		distAssets, err := resolveDistributionAssets(ctx, manifestPath, image)
+		if err != nil {
+			return nil, err
+		}
+		if distAssets.Conf != "" || len(distAssets.IconBytes) > 0 {
+			distDir := filepath.Join(tmpDir, "wsl-distribution")
+			if err := os.MkdirAll(distDir, 0o755); err != nil {
+				return nil, err
+			}
+			if distAssets.Conf != "" {
+				confPath := filepath.Join(distDir, "wsl-distribution.conf")
+				if err := os.WriteFile(confPath, []byte(distAssets.Conf), 0o644); err != nil {
+					return nil, err
+				}
+				df.WriteString("COPY wsl-distribution/wsl-distribution.conf /etc/wsl-distribution.conf\n")
+			}
+			if len(distAssets.IconBytes) > 0 {
+				iconPath := filepath.Join(distDir, "wslb-icon.ico")
+				if err := os.WriteFile(iconPath, distAssets.IconBytes, 0o644); err != nil {
+					return nil, err
+				}
+				df.WriteString("RUN mkdir -p /usr/lib/wsl/icons\n")
+				df.WriteString("COPY wsl-distribution/wslb-icon.ico " + defaultIconInstallPath + "\n")
+			}
+			if strings.TrimSpace(distAssets.WTProfileTemplateJSON) != "" && strings.TrimSpace(distAssets.WTProfileTemplatePath) != "" {
+				templatePath := filepath.Join(distDir, "terminal-profile.json")
+				if err := os.WriteFile(templatePath, []byte(distAssets.WTProfileTemplateJSON), 0o644); err != nil {
+					return nil, err
+				}
+				df.WriteString("RUN mkdir -p " + filepath.ToSlash(filepath.Dir(distAssets.WTProfileTemplatePath)) + "\n")
+				df.WriteString("COPY wsl-distribution/terminal-profile.json " + distAssets.WTProfileTemplatePath + "\n")
+			}
+		}
+
 		for i, fa := range image.WSL.Features {
 			prov, ref, err := router.ProviderFor(fa.Ref)
 			if err != nil {

@@ -47,6 +47,10 @@ If VHD attach fails due to privilege:
 - terminate stable: `wsl --terminate <distro>`
 - import from backup: `wsl --import <distro> <installDir> <backup.tar> --version 2`
 - full shutdown: `wsl --shutdown`
+- stuck WSL recovery script:
+  - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/wsl-recover.ps1`
+- deep recovery (admin): `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/wsl-recover.ps1 -Deep`
+  - auto-elevate helper: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/wsl-recover.ps1 -Deep -AutoElevate`
 
 ## References
 

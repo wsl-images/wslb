@@ -116,6 +116,35 @@ func TestLoadRejectsYAMLManifest(t *testing.T) {
 	}
 }
 
+func TestLoadJSONCManifest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "devcontainer.jsonc")
+	content := `{
+  // comment
+  "name": "jsonc",
+  "image": "ubuntu:24.04",
+  "wslb": {
+    "distroName": "JsoncDistro",
+    "state": {
+      "mode": "windows-dir",
+    },
+  },
+}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	m, _, err := Load(path)
+	if err != nil {
+		t.Fatalf("load jsonc: %v", err)
+	}
+	if len(m.Images) != 1 || m.Images[0].WSL == nil {
+		t.Fatalf("unexpected parsed manifest")
+	}
+	if m.Images[0].WSL.State == nil || m.Images[0].WSL.State.MountPoint != "/home" {
+		t.Fatalf("expected merged default mountpoint for jsonc")
+	}
+}
+
 func TestValidateDistributionIconConflict(t *testing.T) {
 	m := &Manifest{
 		Version: 1,

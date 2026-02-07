@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
   "name": "WSLB Minimal",
   "image": "ubuntu:24.04",
   "features": {
@@ -6,20 +7,9 @@
   },
   "remoteUser": "dev",
   "wslb": {
-    "version": 1,
-    "workspaceName": "wslb-minimal",
-    "imageId": "ubuntu-minimal",
-    "target": "wsl",
-    "displayName": "Ubuntu Minimal",
-    "description": "Minimal WSL devcontainer superset example",
     "distroName": "UbuntuMinimal",
     "managed": false,
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/ubuntu-minimal",
     "wslconf": {
-      "user": {
-        "default": "dev"
-      },
       "boot": {
         "systemd": true
       },
@@ -33,9 +23,11 @@
         "enabled": true,
         "icon": {
           "simpleIcon": "ubuntu",
-          "color": "E95420"
+          "color": "E95420",
+          "style": "flat"
         }
       }
     }
   }
 }
+

@@ -1,9 +1,9 @@
 {
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
   "name": "WSLB Ubuntu Pro",
   "image": "ubuntu:24.04",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
-      "username": "dev",
       "upgradePackages": "false",
       "installZsh": "true"
     },
@@ -17,40 +17,16 @@
     },
     "ghcr.io/devcontainers/features/go:1": {
       "version": "1.24"
-    },
-    "wslb:feature/first-boot-user": {
-      "USERNAME": "dev",
-      "USER_UID": "1000",
-      "USER_GID": "1000",
-      "HOME": "/home/dev"
-    },
-    "wslb:feature/persist-home": {
-      "MOUNT_POINT": "/home",
-      "SYSTEMD": "true"
     }
   },
   "remoteUser": "dev",
   "wslb": {
-    "version": 1,
-    "workspaceName": "wslb-ubuntu-pro",
-    "imageId": "ubuntu-pro",
-    "target": "wsl",
-    "displayName": "Ubuntu Pro Dev",
-    "description": "Managed Ubuntu with rich devcontainer feature set",
     "distroName": "UbuntuPro",
     "managed": true,
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/ubuntu-pro",
     "state": {
-      "mode": "windows-dir",
-      "path": "./state/ubuntu-pro-home",
-      "mountPoint": "/home",
-      "fsLabel": "WSLB_STATE"
+      "mode": "windows-dir"
     },
     "wslconf": {
-      "user": {
-        "default": "dev"
-      },
       "boot": {
         "systemd": true
       },
@@ -72,13 +48,12 @@
         "enabled": true,
         "icon": {
           "simpleIcon": "ubuntu",
-          "color": "E95420"
+          "color": "E95420",
+          "style": "flat"
         }
       }
-    },
-    "tags": [
-      "latest",
-      "dev"
-    ]
+    }
   }
 }
+
+

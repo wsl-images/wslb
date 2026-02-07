@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -111,8 +112,19 @@ func (s *Service) Install(ctx context.Context, manifestPath string, image worksp
 	if err := os.MkdirAll(installDir, 0o755); err != nil {
 		return err
 	}
-	if _, err := runCombined(ctx, "wsl", "--import", image.WSL.DistroName, installDir, artifactPath, "--version", "2"); err != nil {
+	installed := false
+	if err := tryInstallFromWSLPackage(ctx, image.WSL.DistroName, installDir, artifactPath); err == nil {
+		installed = true
+	} else if isFromFileUnsupported(err) {
+		if _, impErr := runCombined(ctx, "wsl", "--import", image.WSL.DistroName, installDir, artifactPath, "--version", "2"); impErr != nil {
+			return impErr
+		}
+		installed = true
+	} else {
 		return err
+	}
+	if !installed {
+		return fmt.Errorf("failed to install distro %s", image.WSL.DistroName)
 	}
 	if err := configureWSLForDistro(ctx, manifestPath, image, image.WSL.DistroName); err != nil {
 		return err
@@ -124,7 +136,23 @@ func (s *Service) Install(ctx context.Context, manifestPath string, image worksp
 	if !ok {
 		return fmt.Errorf("post-install verification failed")
 	}
+	if err := ensureWindowsShortcut(ctx, manifestPath, image); err != nil {
+		return err
+	}
 	return nil
+}
+
+func tryInstallFromWSLPackage(ctx context.Context, distroName, installDir, artifactPath string) error {
+	_, err := runCombined(ctx, "wsl", "--install", "--from-file", artifactPath, "--name", distroName, "--location", installDir, "--no-launch")
+	return err
+}
+
+func isFromFileUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "from-file") && (strings.Contains(msg, "unrecognized") || strings.Contains(msg, "unknown") || strings.Contains(msg, "invalid"))
 }
 
 func (s *Service) Upgrade(ctx context.Context, manifestPath, outputDir string, image workspace.Image, artifactPath string) (string, error) {
@@ -174,6 +202,9 @@ func (s *Service) Upgrade(ctx context.Context, manifestPath, outputDir string, i
 		return "", err
 	}
 	if err := configureWSLForDistro(ctx, manifestPath, image, stable); err != nil {
+		return "", err
+	}
+	if err := ensureWindowsShortcut(ctx, manifestPath, image); err != nil {
 		return "", err
 	}
 	_, _ = runCombined(ctx, "wsl", "--unregister", plan.CandidateName)
@@ -243,6 +274,9 @@ func (s *Service) Rollback(ctx context.Context, manifestPath, outputDir string, 
 	if err := configureWSLForDistro(ctx, manifestPath, image, stable); err != nil {
 		return err
 	}
+	if err := ensureWindowsShortcut(ctx, manifestPath, image); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -265,6 +299,9 @@ func (s *Service) Status(ctx context.Context, image workspace.Image) (string, er
 func configureWSLForDistro(ctx context.Context, manifestPath string, image workspace.Image, distro string) error {
 	if image.WSL == nil {
 		return nil
+	}
+	if err := ensureDistroDefaultUser(ctx, image, distro); err != nil {
+		return err
 	}
 
 	wslConf := renderWSLConf(image)
@@ -372,6 +409,46 @@ func renderWSLConf(image workspace.Image) string {
 	return b.String()
 }
 
+func ensureDistroDefaultUser(ctx context.Context, image workspace.Image, distro string) error {
+	if image.WSL == nil {
+		return nil
+	}
+	u := strings.TrimSpace(image.WSL.DefaultUser.Name)
+	if u == "" {
+		u = "dev"
+	}
+	uid := image.WSL.DefaultUser.UID
+	if uid == 0 {
+		uid = 1000
+	}
+	gid := image.WSL.DefaultUser.GID
+	if gid == 0 {
+		gid = 1000
+	}
+	homeBase := "/home"
+	if image.WSL.State != nil && strings.TrimSpace(image.WSL.State.MountPoint) != "" {
+		homeBase = strings.TrimSpace(image.WSL.State.MountPoint)
+	}
+	home := managedUserHome(homeBase, u)
+	createCmd := fmt.Sprintf(
+		`set -eu; if ! getent group %d >/dev/null 2>&1; then groupadd -g %d %s || true; fi; if ! id -u %s >/dev/null 2>&1; then useradd -m -u %d -g %d -s /bin/bash %s || useradd -m -s /bin/bash %s || true; fi`,
+		gid, gid, shQuote(u),
+		shQuote(u), uid, gid, shQuote(u), shQuote(u),
+	)
+	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", createCmd); err != nil {
+		return fmt.Errorf("failed to ensure default user %s: %w", u, err)
+	}
+	actualUID, actualGID := resolveUserIDs(ctx, distro, workspace.WSLDefaultUser{Name: u, UID: uid, GID: gid})
+	homeCmd := fmt.Sprintf(
+		`set -eu; mkdir -p %s; chown -R %d:%d %s || true`,
+		shQuote(home), actualUID, actualGID, shQuote(home),
+	)
+	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", homeCmd); err != nil {
+		return fmt.Errorf("failed to fix ownership for %s: %w", home, err)
+	}
+	return nil
+}
+
 func boolToString(v bool) string {
 	if v {
 		return "true"
@@ -395,6 +472,14 @@ func verifyDistro(ctx context.Context, image workspace.Image, distro string) (bo
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", test); err != nil {
 			return false, err
 		}
+	}
+	userHome := managedUserHome("/home", image.WSL.DefaultUser.Name)
+	if image.WSL.State != nil && image.WSL.State.MountPoint != "" {
+		userHome = managedUserHome(image.WSL.State.MountPoint, image.WSL.DefaultUser.Name)
+	}
+	userCheck := fmt.Sprintf("set -eu; mkdir -p %q; touch %q/.wslb-user-verify; cat %q/.wslb-user-verify >/dev/null", userHome, userHome, userHome)
+	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", image.WSL.DefaultUser.Name, "--", "sh", "-lc", userCheck); err != nil {
+		return false, err
 	}
 	tools := expectedFeatureTools(image)
 	if len(tools) > 0 {
@@ -448,6 +533,7 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 		dst = "/home"
 	}
 	dstEsc := strings.ReplaceAll(dst, " ", `\040`)
+	uid, gid := resolveUserIDs(ctx, distro, image.WSL.DefaultUser)
 
 	switch image.WSL.State.Mode {
 	case "windows-dir":
@@ -457,10 +543,11 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 			return err
 		}
 		srcEsc := strings.ReplaceAll(windowsSrc, " ", `\040`)
-		mountOpts := fmt.Sprintf("metadata,uid=%d,gid=%d", image.WSL.DefaultUser.UID, image.WSL.DefaultUser.GID)
+		mountOpts := fmt.Sprintf("metadata,uid=%d,gid=%d", uid, gid)
+		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
-			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s drvfs %s 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount -t drvfs %q %q -o %s; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }",
-			linuxSrc, windowsSrc, dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst,
+			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s drvfs %s 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount -t drvfs %q %q -o %s; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }; mkdir -p %q; chown %d:%d %q || true",
+			linuxSrc, windowsSrc, dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst, userHome, uid, gid, userHome,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -472,9 +559,10 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 			return err
 		}
 		srcEsc := strings.ReplaceAll(src, " ", `\040`)
+		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
-			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s none bind 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount --bind %q %q; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }",
-			src, src, dst, srcEsc, dstEsc, dst, src, dst, dst, dst,
+			"set -eu; if [ ! -d %q ]; then echo \"state source does not exist: %s\" >&2; exit 21; fi; mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; echo '%s %s none bind 0 0 # wslb-state' >> /etc/fstab; mountpoint -q %q || mount -a || mount --bind %q %q; mountpoint -q %q || { echo \"managed state mount not active at %s\" >&2; exit 22; }; mkdir -p %q; chown %d:%d %q || true",
+			src, src, dst, srcEsc, dstEsc, dst, src, dst, dst, dst, userHome, uid, gid, userHome,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -512,6 +600,50 @@ func resolveManagedStateSource(ctx context.Context, distro string, image workspa
 		return "", fmt.Errorf("resolved empty Linux path for state source %q", src)
 	}
 	return linuxPath, nil
+}
+
+func managedUserHome(mountPoint, user string) string {
+	mp := strings.TrimSpace(mountPoint)
+	if mp == "" {
+		mp = "/home"
+	}
+	u := strings.TrimSpace(user)
+	if u == "" {
+		u = "dev"
+	}
+	if mp == "/" {
+		return "/" + u
+	}
+	return strings.TrimRight(mp, "/") + "/" + u
+}
+
+func resolveUserIDs(ctx context.Context, distro string, user workspace.WSLDefaultUser) (int, int) {
+	uid := user.UID
+	gid := user.GID
+	if uid == 0 {
+		uid = 1000
+	}
+	if gid == 0 {
+		gid = 1000
+	}
+	name := strings.TrimSpace(user.Name)
+	if name == "" {
+		return uid, gid
+	}
+
+	outUID, errUID := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "id", "-u", name)
+	if errUID == nil {
+		if parsed, parseErr := strconv.Atoi(strings.TrimSpace(outUID)); parseErr == nil && parsed > 0 {
+			uid = parsed
+		}
+	}
+	outGID, errGID := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "id", "-g", name)
+	if errGID == nil {
+		if parsed, parseErr := strconv.Atoi(strings.TrimSpace(outGID)); parseErr == nil && parsed > 0 {
+			gid = parsed
+		}
+	}
+	return uid, gid
 }
 
 func windowsPathToWSLArg(path string) string {
@@ -577,6 +709,69 @@ func runCombined(ctx context.Context, bin string, args ...string) (string, error
 		return decoded, fmt.Errorf("%s %s failed: %w\n%s", bin, strings.Join(args, " "), err, decoded)
 	}
 	return decoded, nil
+}
+
+func ensureWindowsShortcut(ctx context.Context, manifestPath string, image workspace.Image) error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	if image.WSL == nil || image.WSL.Distribution == nil || image.WSL.Distribution.Shortcut == nil {
+		return nil
+	}
+	enabled := true
+	if image.WSL.Distribution.Shortcut.Enabled != nil {
+		enabled = *image.WSL.Distribution.Shortcut.Enabled
+	}
+	if !enabled {
+		return nil
+	}
+
+	assets, err := resolveDistributionAssets(ctx, manifestPath, image)
+	if err != nil {
+		return err
+	}
+	if len(assets.IconBytes) == 0 {
+		return nil
+	}
+
+	localAppData := os.Getenv("LOCALAPPDATA")
+	appData := os.Getenv("APPDATA")
+	if localAppData == "" || appData == "" {
+		return fmt.Errorf("LOCALAPPDATA/APPDATA not available for shortcut creation")
+	}
+
+	iconDir := filepath.Join(localAppData, "wslb", "icons")
+	if err := os.MkdirAll(iconDir, 0o755); err != nil {
+		return err
+	}
+	iconPath := filepath.Join(iconDir, image.WSL.DistroName+".ico")
+	if err := os.WriteFile(iconPath, assets.IconBytes, 0o644); err != nil {
+		return err
+	}
+
+	startMenuDir := filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "WSLB")
+	if err := os.MkdirAll(startMenuDir, 0o755); err != nil {
+		return err
+	}
+	linkPath := filepath.Join(startMenuDir, image.WSL.DistroName+".lnk")
+	args := fmt.Sprintf("-d %s --cd ~", image.WSL.DistroName)
+	ps := fmt.Sprintf(
+		`$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut('%s'); $s.TargetPath='wsl.exe'; $s.Arguments='%s'; $s.IconLocation='%s,0'; $s.WorkingDirectory='%s'; $s.Save()`,
+		psSingleQuote(linkPath),
+		psSingleQuote(args),
+		psSingleQuote(iconPath),
+		psSingleQuote(os.Getenv("USERPROFILE")),
+	)
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed creating Windows shortcut: %w\n%s", err, windows.DecodePossiblyUTF16(out))
+	}
+	return nil
+}
+
+func psSingleQuote(in string) string {
+	return strings.ReplaceAll(in, `'`, `''`)
 }
 
 func historyPath(outputDir, imageID string) string {

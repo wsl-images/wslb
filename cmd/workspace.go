@@ -146,7 +146,7 @@ var workspacePublishCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(workspaceCmd)
-	workspaceCmd.PersistentFlags().StringVar(&workspaceFile, "workspace-file", workspace.DefaultManifestPath, "Path to devcontainer superset manifest (.json)")
+	workspaceCmd.PersistentFlags().StringVar(&workspaceFile, "workspace-file", workspace.DefaultManifestPath, "Path to devcontainer superset manifest (.json or .jsonc)")
 
 	workspaceCmd.AddCommand(workspaceInitCmd)
 	workspaceCmd.AddCommand(workspaceValidateCmd)

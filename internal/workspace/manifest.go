@@ -103,7 +103,9 @@ type WSLDistributionConfig struct {
 }
 
 type WSLDistributionOOBE struct {
-	Command string `yaml:"command,omitempty" json:"command,omitempty"`
+	DefaultName string `yaml:"defaultName,omitempty" json:"defaultName,omitempty"`
+	DefaultUID  *int   `yaml:"defaultUid,omitempty" json:"defaultUid,omitempty"`
+	Command     string `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
 type WSLDistributionShortcut struct {
@@ -115,6 +117,7 @@ type WSLDIcon struct {
 	Path       string `yaml:"path,omitempty" json:"path,omitempty"`
 	SimpleIcon string `yaml:"simpleIcon,omitempty" json:"simpleIcon,omitempty"`
 	Color      string `yaml:"color,omitempty" json:"color,omitempty"`
+	Style      string `yaml:"style,omitempty" json:"style,omitempty"`
 }
 
 type FeatureAssignment struct {

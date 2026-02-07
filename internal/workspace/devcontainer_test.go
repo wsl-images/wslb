@@ -128,6 +128,41 @@ func TestParseDevcontainerSupersetLegacyWSLConfBooleans(t *testing.T) {
 	}
 }
 
+func TestParseDevcontainerSupersetConventionDefaults(t *testing.T) {
+	jsonText := `{
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
+  "name": "My Dev",
+  "image": "ubuntu:24.04",
+  "remoteUser": "steve",
+  "wslb": {
+    "distroName": "MyDevDistro",
+    "state": {
+      "mode": "windows-dir"
+    }
+  }
+}`
+	m, err := ParseDevcontainerSuperset([]byte(jsonText), filepath.Join(t.TempDir(), "devcontainer.json"))
+	if err != nil {
+		t.Fatalf("ParseDevcontainerSuperset failed: %v", err)
+	}
+	img := m.Images[0]
+	if img.Target != "wsl" {
+		t.Fatalf("target=%q", img.Target)
+	}
+	if img.ID != "mydevdistro" {
+		t.Fatalf("id=%q", img.ID)
+	}
+	if img.WSL.InstallDir == "" {
+		t.Fatalf("expected default installDir")
+	}
+	if img.WSL.DefaultUser.Name != "steve" {
+		t.Fatalf("default user=%q", img.WSL.DefaultUser.Name)
+	}
+	if img.WSL.State == nil || img.WSL.State.MountPoint != "/home" {
+		t.Fatalf("expected merged default state mountPoint")
+	}
+}
+
 func TestLoadFallsBackToDevcontainerPath(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -152,6 +187,40 @@ func TestLoadFallsBackToDevcontainerPath(t *testing.T) {
 		t.Fatalf("load fallback: %v", err)
 	}
 	if filepath.Base(abs) != "devcontainer.json" {
+		t.Fatalf("abs=%q", abs)
+	}
+	if len(m.Images) != 1 {
+		t.Fatalf("images=%d", len(m.Images))
+	}
+}
+
+func TestLoadFallsBackToJSONC(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir tmp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	content := `{
+  "name": "demo-jsonc",
+  "image": "ubuntu:24.04",
+  "wslb": {
+    "distroName": "DemoJSONC"
+  }
+}`
+	if err := os.WriteFile("devcontainer.jsonc", []byte(content), 0o644); err != nil {
+		t.Fatalf("write devcontainer jsonc: %v", err)
+	}
+
+	m, abs, err := Load(DefaultManifestPath)
+	if err != nil {
+		t.Fatalf("load fallback jsonc: %v", err)
+	}
+	if filepath.Base(abs) != "devcontainer.jsonc" {
 		t.Fatalf("abs=%q", abs)
 	}
 	if len(m.Images) != 1 {

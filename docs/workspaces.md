@@ -1,70 +1,67 @@
 # Workspaces
 
-`wslb` supports a `devcontainer.json` superset manifest at `.devcontainer/devcontainer.json`.
+`wslb` supports a convention-first `devcontainer` superset:
+
+- `.devcontainer/devcontainer.json`
+- `.devcontainer/devcontainer.jsonc`
+- `devcontainer.json`
+- `devcontainer.jsonc`
 
 ## Superset Shape
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
   "name": "Ubuntu Dev",
   "image": "ubuntu:24.04",
   "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {},
-    "wslb:feature/first-boot-user": {
-      "USERNAME": "dev"
-    }
+    "ghcr.io/devcontainers/features/common-utils:2": {}
   },
   "remoteUser": "dev",
   "wslb": {
-    "version": 1,
-    "workspaceName": "demo",
-    "imageId": "dev-ubuntu",
-    "target": "wsl",
     "distroName": "DevUbuntu",
     "managed": true,
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/dev-ubuntu",
     "state": {
-      "mode": "vhdx",
-      "path": "./state/dev-ubuntu.vhdx",
-      "mountPoint": "/home",
-      "fsLabel": "WSLB_STATE"
+      "mode": "windows-dir"
     },
     "wslconf": {
-      "user": { "default": "dev" },
-      "boot": { "systemd": true, "command": "echo booted" },
-      "automount": {
-        "enabled": true,
-        "mountFsTab": true,
-        "options": "metadata"
-      },
-      "network": {
-        "hostname": "dev-ubuntu",
-        "generateHosts": true,
-        "generateResolvConf": true
-      },
-      "interop": { "enabled": true, "appendWindowsPath": true }
+      "boot": { "systemd": true }
     },
     "distribution": {
-      "oobe": { "command": "usermod --shell /bin/bash dev" },
+      "oobe": { "defaultName": "dev" },
       "shortcut": {
         "enabled": true,
-        "icon": {
-          "simpleIcon": "ubuntu",
-          "color": "E95420"
-        }
+        "icon": { "simpleIcon": "ubuntu", "color": "E95420", "style": "flat" }
       }
     }
   }
 }
 ```
 
-## Devcontainer Superset (WSL)
+## Convention Over Configuration
 
-`wslb` loads `.devcontainer/devcontainer.json` (or any `*.json` path you pass via `--workspace-file`) as a WSL superset.
+You no longer need to repeat most WSL-only values:
+
+- `target` is implicit (`wsl`); if provided it must still be `wsl`
+- `workspaceName` defaults from `name`
+- `outputDir` defaults to `./.wslb-out`
+- `installDir` defaults to `<outputDir>/distros/<distroName>`
+- `imageId` defaults from `wslb.id` / `wslb.imageId` / `wslb.distroName` / `name`
+- `wslb.user` defaults from `remoteUser` (or `containerUser`, then `dev`)
+- `wslconf.user.default` defaults from resolved user name
+- `state.path`, `state.mountPoint`, `state.fsLabel` are defaulted when omitted
+- managed user creation + managed state mount wiring are handled automatically; you do not need to repeat internal features for baseline behavior
+
+## JSON, JSONC, and Schema
+
+- `wslb` accepts both JSON and JSONC (comments and trailing commas).
+- Schema URL for editor IntelliSense:
+  - `https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json`
+- Local schema file in repo:
+  - `schemas/wslb-workspace.schema.json`
 
 - Standard Dev Container fields are reused (`name`, `image`, `features`, `remoteUser`).
-- A top-level `wslb` block adds WSL lifecycle settings (`distroName`, `managed`, `state`, `wslconf`, etc.).
+- A top-level `wslb` block adds WSL lifecycle settings (`distroName`, `managed`, `state`, `wslconf`, `distribution`).
 - `wslb.wslconf` supports full `wsl.conf` sections:
   - `user.default`
   - `boot.systemd`, `boot.command`
@@ -72,12 +69,13 @@
   - `network.hostname`, `network.generateHosts`, `network.generateResolvConf`
   - `interop.enabled`, `interop.appendWindowsPath`
 - `wslb.distribution` writes `/etc/wsl-distribution.conf`:
-  - `oobe.command`
+  - `oobe.defaultName`, `oobe.defaultUid`, `oobe.command`
   - `shortcut.enabled`
+  - `windowsterminal.ProfileTemplate` is auto-emitted when an icon is configured
   - `shortcut.icon` can be:
     - string path/URL to `.ico`
     - object `{ "path": "...ico" }`
-    - object `{ "simpleIcon": "<slug>", "color": "E95420" }` (fetched from Simple Icons and converted to `.ico`)
+    - object `{ "simpleIcon": "<slug>", "color": "E95420", "style": "flat|badge" }` (fetched from Simple Icons and converted to `.ico`)
 - `features` map entries are converted to ordered feature refs/options for the WSL build pipeline.
 
 Examples:
@@ -98,7 +96,7 @@ Examples:
 ## Validation Rules
 
 - `image` is required
-- `wslb.target` must be `wsl`
+- `wslb.target`, if provided, must be `wsl`
 - managed WSL requires `wslb.state`
 - feature refs must parse as OCI/devcontainer or `wslb:feature/<id>`
 
@@ -110,3 +108,5 @@ Examples:
 - ordered steps
 - artifact paths
 - candidate/backup naming for managed WSL
+
+

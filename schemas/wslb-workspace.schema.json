@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
+  "title": "wslb Devcontainer Superset",
+  "description": "Convention-first devcontainer.json/jsonc superset for wslb (WSL-only).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "image"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional schema association URL for editor IntelliSense."
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name used for defaults."
+    },
+    "image": {
+      "type": "string",
+      "description": "Base OCI image reference for the distro rootfs."
+    },
+    "remoteUser": {
+      "type": "string",
+      "description": "Preferred user name; used as default WSL user unless overridden."
+    },
+    "containerUser": {
+      "type": "string",
+      "description": "Fallback user name if remoteUser is omitted."
+    },
+    "features": {
+      "type": "object",
+      "description": "Dev Container features plus wslb internal features.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "wslb": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "WSL lifecycle extension.",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "description": "Optional explicit image id. Preferred over legacy imageId."
+        },
+        "imageId": {
+          "type": "string",
+          "description": "Legacy alias for id."
+        },
+        "distroName": {
+          "type": "string",
+          "description": "WSL registered distro name."
+        },
+        "managed": {
+          "type": "boolean",
+          "default": true
+        },
+        "user": {
+          "$ref": "#/$defs/user"
+        },
+        "defaultUser": {
+          "$ref": "#/$defs/user",
+          "description": "Legacy alias for user."
+        },
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "wslconf": {
+          "$ref": "#/$defs/wslconf"
+        },
+        "distribution": {
+          "$ref": "#/$defs/distribution"
+        },
+        "outputDir": {
+          "type": "string",
+          "description": "Optional override. Default: ./.wslb-out"
+        },
+        "installDir": {
+          "type": "string",
+          "description": "Optional override. Default: <outputDir>/distros/<distroName>"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "workspaceName": {
+          "type": "string",
+          "description": "Optional override; normally inferred from name."
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "wsl"
+          ],
+          "description": "Optional legacy field. wslb is WSL-only."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        },
+        "gid": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "vhdx",
+            "windows-dir"
+          ],
+          "default": "windows-dir"
+        },
+        "path": {
+          "type": "string"
+        },
+        "mountPoint": {
+          "type": "string",
+          "default": "/home"
+        },
+        "fsLabel": {
+          "type": "string",
+          "default": "WSLB_STATE"
+        }
+      }
+    },
+    "wslconf": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "systemd": {
+          "type": "boolean",
+          "description": "Legacy shorthand for boot.systemd."
+        },
+        "automount": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Legacy shorthand for automount.enabled."
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "string"
+                },
+                "mountFsTab": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        },
+        "user": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "string"
+            }
+          }
+        },
+        "boot": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "systemd": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "string"
+            }
+          }
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hostname": {
+              "type": "string"
+            },
+            "generateHosts": {
+              "type": "boolean"
+            },
+            "generateResolvConf": {
+              "type": "boolean"
+            }
+          }
+        },
+        "interop": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "appendWindowsPath": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "oobe": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "defaultName": {
+              "type": "string"
+            },
+            "defaultUid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "command": {
+              "type": "string"
+            }
+          }
+        },
+        "shortcut": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "icon": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Path or URL to an icon file (ico/svg/png/jpg)."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "simpleIcon": {
+                      "type": "string",
+                      "description": "Simple Icons slug, e.g. ubuntu, docker."
+                    },
+                    "color": {
+                      "type": "string",
+                      "description": "Optional hex color override."
+                    },
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "flat",
+                        "badge"
+                      ],
+                      "description": "Icon rendering style. Defaults to flat."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+

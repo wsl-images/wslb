@@ -1,14 +1,17 @@
 package workspace
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/tailscale/hujson"
 )
 
 const DefaultManifestPath = DefaultDevcontainerPath
+const DefaultDevcontainerJSONCPath = ".devcontainer/devcontainer.jsonc"
 
 func Load(path string) (*Manifest, string, error) {
 	if path == "" {
@@ -25,10 +28,11 @@ func Load(path string) (*Manifest, string, error) {
 		return nil, abs, err
 	}
 
-	if !json.Valid(b) {
-		return nil, abs, errors.New("manifest must be JSON devcontainer superset")
+	normalized, err := normalizeJSONOrJSONC(b)
+	if err != nil {
+		return nil, abs, err
 	}
-	m, err := ParseDevcontainerSuperset(b, abs)
+	m, err := ParseDevcontainerSuperset(normalized, abs)
 	if err != nil {
 		return nil, abs, err
 	}
@@ -69,7 +73,7 @@ func resolveManifestPath(path string) (string, error) {
 	}
 	// For the default path, auto-discover root devcontainer.json as fallback.
 	if path == DefaultManifestPath {
-		for _, candidate := range []string{"devcontainer.json"} {
+		for _, candidate := range []string{DefaultDevcontainerJSONCPath, "devcontainer.jsonc", "devcontainer.json"} {
 			cAbs, cErr := filepath.Abs(candidate)
 			if cErr != nil {
 				continue
@@ -80,7 +84,18 @@ func resolveManifestPath(path string) (string, error) {
 		}
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return abs, fmt.Errorf("manifest not found: %s (expected devcontainer superset JSON)", abs)
+		return abs, fmt.Errorf("manifest not found: %s (expected devcontainer superset JSON/JSONC)", abs)
 	}
 	return abs, err
+}
+
+func normalizeJSONOrJSONC(raw []byte) ([]byte, error) {
+	normalized, err := hujson.Standardize(raw)
+	if err != nil {
+		return nil, errors.New("manifest must be valid JSON/JSONC devcontainer superset")
+	}
+	if len(strings.TrimSpace(string(normalized))) == 0 {
+		return nil, errors.New("manifest is empty")
+	}
+	return normalized, nil
 }

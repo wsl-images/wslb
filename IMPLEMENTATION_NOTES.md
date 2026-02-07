@@ -89,5 +89,15 @@
   - legacy shorthand (`systemd`, `automount` booleans) remains accepted.
 - `distribution.shortcut.icon` supports:
   - direct `.ico` path/URL
-  - Simple Icons slug (`simpleIcon`) with optional color override; `wslb` fetches SVG and converts to `.ico`.
+  - Simple Icons slug (`simpleIcon`) with optional `color` and `style` (`flat` default, `badge` optional); `wslb` fetches SVG and converts to `.ico`.
+- Icon/start-menu reliability updates:
+  - distro metadata (`/etc/wsl-distribution.conf`) and icon are now embedded into the built rootfs before install.
+  - install prefers `wsl --install --from-file` so WSL applies custom-distro metadata at install time.
+- Config simplification updates:
+  - convention-over-configuration defaults remove repeated `target/workspaceName/outputDir/installDir/imageId` requirements for typical WSL usage.
+  - `wslb.user` is the preferred single user override (legacy `defaultUser` still supported).
+  - managed user creation + managed mount wiring are automatic, so baseline manifests do not need to repeat internal `wslb:feature/*` entries.
+- Manifest format updates:
+  - both JSON and JSONC are accepted.
+  - schema file provided at `schemas/wslb-workspace.schema.json` with raw GitHub URL for `$schema` association.
 - Feature tool availability is now verified during install/upgrade for selected feature refs (`node`, `go`, `python`, `git`, `github-cli`).

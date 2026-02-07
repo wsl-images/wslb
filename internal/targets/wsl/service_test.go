@@ -85,3 +85,22 @@ func TestRenderWSLConfSections(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedUserHome(t *testing.T) {
+	cases := []struct {
+		mount string
+		user  string
+		want  string
+	}{
+		{mount: "/home", user: "dev", want: "/home/dev"},
+		{mount: "/workspace/home", user: "alice", want: "/workspace/home/alice"},
+		{mount: "/", user: "dev", want: "/dev"},
+		{mount: "", user: "", want: "/home/dev"},
+	}
+	for _, c := range cases {
+		got := managedUserHome(c.mount, c.user)
+		if got != c.want {
+			t.Fatalf("managedUserHome(%q,%q)=%q want=%q", c.mount, c.user, got, c.want)
+		}
+	}
+}

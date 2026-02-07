@@ -132,38 +132,32 @@ try {
   "image": "ubuntu:24.04",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
-      "username": "dev",
       "installZsh": "false",
       "upgradePackages": "false"
-    },
-    "wslb:feature/first-boot-user": {
-      "USERNAME": "dev",
-      "USER_UID": "1000",
-      "USER_GID": "1000",
-      "HOME": "/home/dev"
     }
   },
   "remoteUser": "dev",
   "wslb": {
     "version": 1,
-    "workspaceName": "e2e",
-    "imageId": "$imageID",
-    "target": "wsl",
+    "id": "$imageID",
     "displayName": "E2E Ubuntu",
     "description": "E2E managed image",
     "distroName": "$distroName",
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/$imageID",
     "managed": true,
     "state": {
-      "mode": "vhdx",
-      "path": "./state/home.vhdx",
-      "mountPoint": "/home",
-      "fsLabel": "WSLB_STATE"
+      "mode": "windows-dir",
+      "path": "./state/home",
+      "mountPoint": "/home"
     },
     "wslconf": {
-      "systemd": true,
-      "automount": true
+      "boot": { "systemd": true },
+      "automount": { "enabled": true, "mountFsTab": true, "options": "metadata" }
+    },
+    "distribution": {
+      "shortcut": {
+        "enabled": true,
+        "icon": { "simpleIcon": "ubuntu", "color": "E95420", "style": "flat" }
+      }
     }
   }
 }

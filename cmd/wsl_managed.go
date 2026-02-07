@@ -181,7 +181,7 @@ var wslManagedStatusCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(wslManagedCmd)
-	wslManagedCmd.PersistentFlags().StringVar(&wslWorkspaceFile, "workspace-file", workspace.DefaultManifestPath, "Path to devcontainer superset manifest (.json)")
+	wslManagedCmd.PersistentFlags().StringVar(&wslWorkspaceFile, "workspace-file", workspace.DefaultManifestPath, "Path to devcontainer superset manifest (.json or .jsonc)")
 	wslManagedCmd.PersistentFlags().StringVar(&wslEngine, "engine", "", "Preferred build engine: docker or podman")
 	wslManagedCmd.PersistentFlags().BoolVar(&wslFallbackWindowsDir, "fallback-windows-dir", false, "Fallback to windows-dir state mode on mount/elevation issues")
 	wslManagedCmd.PersistentFlags().BoolVar(&wslNonInteractive, "non-interactive", false, "Disable interactive prompts and fail deterministically")

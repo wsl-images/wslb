@@ -6,47 +6,26 @@ import (
 )
 
 const defaultDevcontainerSuperset = `{
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
   "name": "WSLB Dev Container",
   "image": "ubuntu:24.04",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "username": "dev",
       "upgradePackages": "false"
-    },
-    "wslb:feature/first-boot-user": {
-      "USERNAME": "dev",
-      "USER_UID": "1000",
-      "USER_GID": "1000",
-      "HOME": "/home/dev"
-    },
-    "wslb:feature/persist-home": {
-      "MOUNT_POINT": "/home",
-      "SYSTEMD": "true"
     }
   },
   "remoteUser": "dev",
   "wslb": {
     "version": 1,
-    "workspaceName": "wslb-devcontainer",
-    "imageId": "wslb-dev",
-    "target": "wsl",
     "distroName": "WSLBDev",
     "managed": true,
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/wslb-dev",
     "state": {
       "mode": "windows-dir",
-      "path": "./state/wslb-dev-home",
-      "mountPoint": "/home",
-      "fsLabel": "WSLB_STATE"
+      "mountPoint": "/home"
     },
     "wslconf": {
-      "user": {
-        "default": "dev"
-      },
-      "boot": {
-        "systemd": true
-      },
+      "boot": { "systemd": true },
       "automount": {
         "enabled": true,
         "mountFsTab": true,
@@ -59,13 +38,15 @@ const defaultDevcontainerSuperset = `{
     },
     "distribution": {
       "oobe": {
-        "command": "usermod --shell /bin/bash dev"
+        "defaultName": "dev",
+        "command": "echo 'WSLB OOBE complete'"
       },
       "shortcut": {
         "enabled": true,
         "icon": {
           "simpleIcon": "ubuntu",
-          "color": "E95420"
+          "color": "E95420",
+          "style": "flat"
         }
       }
     }

@@ -14,6 +14,7 @@ const (
 )
 
 type DevcontainerSuperset struct {
+	Schema        string                 `json:"$schema,omitempty"`
 	Name          string                 `json:"name"`
 	Image         string                 `json:"image"`
 	Features      map[string]interface{} `json:"features"`
@@ -23,6 +24,7 @@ type DevcontainerSuperset struct {
 }
 
 type DevcontainerWSLB struct {
+	ID             string                 `json:"id,omitempty"`
 	Version        int                    `json:"version,omitempty"`
 	WorkspaceName  string                 `json:"workspaceName,omitempty"`
 	OutputDir      string                 `json:"outputDir,omitempty"`
@@ -33,6 +35,7 @@ type DevcontainerWSLB struct {
 	DistroName     string                 `json:"distroName,omitempty"`
 	InstallDir     string                 `json:"installDir,omitempty"`
 	Managed        *bool                  `json:"managed,omitempty"`
+	User           *WSLDefaultUser        `json:"user,omitempty"`
 	DefaultUser    *WSLDefaultUser        `json:"defaultUser,omitempty"`
 	State          *WSLStateConfig        `json:"state,omitempty"`
 	WSLConf        *WSLConfConfig         `json:"wslconf,omitempty"`
@@ -52,8 +55,12 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 
 	wslb := dc.WSLB
 	imageID := "devcontainer-wsl"
-	if wslb != nil && strings.TrimSpace(wslb.ImageID) != "" {
+	if wslb != nil && strings.TrimSpace(wslb.ID) != "" {
+		imageID = strings.TrimSpace(wslb.ID)
+	} else if wslb != nil && strings.TrimSpace(wslb.ImageID) != "" {
 		imageID = strings.TrimSpace(wslb.ImageID)
+	} else if wslb != nil && strings.TrimSpace(wslb.DistroName) != "" {
+		imageID = slug(strings.TrimSpace(wslb.DistroName))
 	} else if strings.TrimSpace(dc.Name) != "" {
 		imageID = slug(strings.TrimSpace(dc.Name))
 	}
@@ -84,17 +91,23 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 		userName = "dev"
 	}
 	defaultUser := WSLDefaultUser{Name: userName, UID: 1000, GID: 1000}
-	if wslb != nil && wslb.DefaultUser != nil {
-		defaultUser = *wslb.DefaultUser
-		if strings.TrimSpace(defaultUser.Name) == "" {
-			defaultUser.Name = userName
+	if wslb != nil {
+		if wslb.User != nil {
+			defaultUser = *wslb.User
 		}
-		if defaultUser.UID == 0 {
-			defaultUser.UID = 1000
+		if wslb.DefaultUser != nil {
+			// Legacy field support.
+			defaultUser = *wslb.DefaultUser
 		}
-		if defaultUser.GID == 0 {
-			defaultUser.GID = 1000
-		}
+	}
+	if strings.TrimSpace(defaultUser.Name) == "" {
+		defaultUser.Name = userName
+	}
+	if defaultUser.UID == 0 {
+		defaultUser.UID = 1000
+	}
+	if defaultUser.GID == 0 {
+		defaultUser.GID = 1000
 	}
 
 	distroName := toDistroName(imageID)
@@ -118,7 +131,7 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 		FSLabel:    "WSLB_STATE",
 	}
 	if wslb != nil && wslb.State != nil {
-		state = wslb.State
+		state = mergeStateConfig(state, wslb.State)
 	}
 
 	wslconf := DefaultWSLConfConfig()
@@ -174,7 +187,7 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 					DefaultUser:  defaultUser,
 					State:        state,
 					WSLConf:      wslconf,
-					Distribution: normalizeDistribution(wslb),
+					Distribution: normalizeDistribution(wslb, defaultUser),
 					Features:     features,
 				},
 			},
@@ -182,11 +195,49 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 	}, nil
 }
 
-func normalizeDistribution(wslb *DevcontainerWSLB) *WSLDistributionConfig {
+func mergeStateConfig(def, custom *WSLStateConfig) *WSLStateConfig {
+	if def == nil && custom == nil {
+		return nil
+	}
+	if def == nil {
+		clone := *custom
+		return &clone
+	}
+	out := *def
+	if custom == nil {
+		return &out
+	}
+	if strings.TrimSpace(custom.Mode) != "" {
+		out.Mode = custom.Mode
+	}
+	if strings.TrimSpace(custom.Path) != "" {
+		out.Path = custom.Path
+	}
+	if strings.TrimSpace(custom.MountPoint) != "" {
+		out.MountPoint = custom.MountPoint
+	}
+	if strings.TrimSpace(custom.FSLabel) != "" {
+		out.FSLabel = custom.FSLabel
+	}
+	return &out
+}
+
+func normalizeDistribution(wslb *DevcontainerWSLB, defaultUser WSLDefaultUser) *WSLDistributionConfig {
 	if wslb == nil || wslb.Distribution == nil {
 		return nil
 	}
-	return wslb.Distribution
+	dist := *wslb.Distribution
+	if dist.OOBE == nil {
+		dist.OOBE = &WSLDistributionOOBE{}
+	}
+	if strings.TrimSpace(dist.OOBE.DefaultName) == "" {
+		dist.OOBE.DefaultName = defaultUser.Name
+	}
+	if dist.Shortcut != nil && dist.Shortcut.Enabled == nil {
+		enabled := true
+		dist.Shortcut.Enabled = &enabled
+	}
+	return &dist
 }
 
 func normalizeWSLConf(cfg WSLConfConfig, defaultUser string) WSLConfConfig {

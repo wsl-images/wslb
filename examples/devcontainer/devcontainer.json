@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
   "name": "WSLB Ubuntu Superset",
   "image": "ubuntu:24.04",
   "features": {
@@ -17,73 +18,37 @@
     },
     "ghcr.io/devcontainers/features/go:1": {
       "version": "1.24"
-    },
-    "wslb:feature/first-boot-user": {
-      "USERNAME": "dev",
-      "USER_UID": "1000",
-      "USER_GID": "1000",
-      "HOME": "/home/dev"
-    },
-    "wslb:feature/persist-home": {
-      "MOUNT_POINT": "/home",
-      "SYSTEMD": "true"
     }
   },
   "remoteUser": "dev",
   "wslb": {
     "version": 1,
-    "workspaceName": "wslb-devcontainer-superset",
-    "imageId": "ubuntu-devcontainer",
-    "target": "wsl",
-    "displayName": "Ubuntu Devcontainer WSL",
-    "description": "Dev Container superset resolved by wslb into managed WSL lifecycle",
     "distroName": "UbuntuDevcontainer",
     "managed": true,
-    "outputDir": "./.wslb-out",
-    "installDir": "./distros/ubuntu-devcontainer",
     "state": {
-      "mode": "windows-dir",
-      "path": "./state/ubuntu-devcontainer-home",
-      "mountPoint": "/home",
-      "fsLabel": "WSLB_STATE"
+      "mode": "windows-dir"
     },
     "wslconf": {
-      "user": {
-        "default": "dev"
-      },
       "boot": {
-        "systemd": true
-      },
-      "automount": {
-        "enabled": true,
-        "mountFsTab": true,
-        "options": "metadata,umask=022"
-      },
-      "network": {
-        "hostname": "ubuntu-devcontainer",
-        "generateHosts": true,
-        "generateResolvConf": true
-      },
-      "interop": {
-        "enabled": true,
-        "appendWindowsPath": true
+        "systemd": true,
+        "command": "echo 'boot ok'"
       }
     },
     "distribution": {
       "oobe": {
-        "command": "usermod --shell /bin/bash dev"
+        "defaultName": "dev",
+        "command": "echo 'WSLB OOBE complete'"
       },
       "shortcut": {
         "enabled": true,
         "icon": {
           "simpleIcon": "ubuntu",
-          "color": "E95420"
+          "color": "E95420",
+          "style": "flat"
         }
       }
-    },
-    "tags": [
-      "latest",
-      "dev"
-    ]
+    }
   }
 }
+
+
