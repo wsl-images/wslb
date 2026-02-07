@@ -38,6 +38,7 @@ type WSLImageConfig struct {
 	DistroName   string                 `yaml:"distroName" json:"distroName"`
 	InstallDir   string                 `yaml:"installDir" json:"installDir"`
 	DefaultUser  WSLDefaultUser         `yaml:"defaultUser" json:"defaultUser"`
+	OOBE         *WSLOOBEConfig         `yaml:"oobe,omitempty" json:"oobe,omitempty"`
 	State        *WSLStateConfig        `yaml:"state" json:"state,omitempty"`
 	WSLConf      WSLConfConfig          `yaml:"wslconf" json:"wslconf"`
 	WSLConfig    *WSLGlobalConfig       `yaml:"wslconfig,omitempty" json:"wslconfig,omitempty"`
@@ -58,6 +59,12 @@ type WSLStateConfig struct {
 	FSLabel    string `yaml:"fsLabel" json:"fsLabel"`
 }
 
+type WSLOOBEConfig struct {
+	Mode              string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	Strategy          string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+	PromptForPassword *bool  `yaml:"promptForPassword,omitempty" json:"promptForPassword,omitempty"`
+}
+
 type WSLConfConfig struct {
 	// Legacy shorthand fields:
 	//   "wslconf": {"systemd": true, "automount": true}
@@ -71,6 +78,9 @@ type WSLConfConfig struct {
 	Interop   *WSLConfInterop   `yaml:"interop,omitempty" json:"interop,omitempty"`
 	GPU       *WSLConfGPU       `yaml:"gpu,omitempty" json:"gpu,omitempty"`
 	Time      *WSLConfTime      `yaml:"time,omitempty" json:"time,omitempty"`
+
+	// Pass-through sections for forward-compatibility with new wsl.conf blocks.
+	ExtraSections map[string]map[string]interface{} `yaml:"-" json:"-"`
 }
 
 type WSLConfUser struct {
@@ -114,6 +124,9 @@ type WSLDistributionConfig struct {
 	OOBE            *WSLDistributionOOBE            `yaml:"oobe,omitempty" json:"oobe,omitempty"`
 	Shortcut        *WSLDistributionShortcut        `yaml:"shortcut,omitempty" json:"shortcut,omitempty"`
 	WindowsTerminal *WSLDistributionWindowsTerminal `yaml:"windowsterminal,omitempty" json:"windowsterminal,omitempty"`
+
+	// Pass-through sections for forward-compatibility with new /etc/wsl-distribution.conf blocks.
+	ExtraSections map[string]map[string]interface{} `yaml:"-" json:"-"`
 }
 
 type WSLDistributionOOBE struct {
@@ -235,6 +248,22 @@ func (c *WSLConfConfig) UnmarshalJSON(data []byte) error {
 		}
 		out.LegacySystemd = &sys
 	}
+	known := map[string]struct{}{
+		"user": {}, "boot": {}, "automount": {}, "network": {}, "interop": {}, "gpu": {}, "time": {}, "systemd": {},
+	}
+	for k, v := range raw {
+		if _, ok := known[k]; ok {
+			continue
+		}
+		var section map[string]interface{}
+		if err := json.Unmarshal(v, &section); err != nil {
+			return fmt.Errorf("wslconf.%s: extra sections must be objects", k)
+		}
+		if out.ExtraSections == nil {
+			out.ExtraSections = map[string]map[string]interface{}{}
+		}
+		out.ExtraSections[k] = section
+	}
 
 	*c = WSLConfConfig(out)
 	return nil
@@ -309,6 +338,22 @@ func (d *WSLDistributionConfig) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("distribution.windowsTerminal: %w", err)
 		}
 		out.WindowsTerminal = &wt
+	}
+	known := map[string]struct{}{
+		"oobe": {}, "shortcut": {}, "windowsterminal": {}, "windowsTerminal": {},
+	}
+	for k, v := range raw {
+		if _, ok := known[k]; ok {
+			continue
+		}
+		var section map[string]interface{}
+		if err := json.Unmarshal(v, &section); err != nil {
+			return fmt.Errorf("distribution.%s: extra sections must be objects", k)
+		}
+		if out.ExtraSections == nil {
+			out.ExtraSections = map[string]map[string]interface{}{}
+		}
+		out.ExtraSections[k] = section
 	}
 
 	*d = WSLDistributionConfig(out)

@@ -3,6 +3,7 @@
   "name": "WSLB Ubuntu Superset",
   "image": "ubuntu:24.04",
   "features": {
+    "wslb:feature/wsl-prereqs": {},
     "ghcr.io/devcontainers/features/common-utils:2": {
       "username": "dev",
       "installZsh": "true",
@@ -25,6 +26,11 @@
     "version": 1,
     "distroName": "UbuntuDevcontainer",
     "managed": true,
+    "oobe": {
+      "mode": "auto",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
     "state": {
       "mode": "windows-dir"
     },
@@ -35,10 +41,6 @@
       }
     },
     "distribution": {
-      "oobe": {
-        "defaultName": "dev",
-        "command": "echo 'WSLB OOBE complete'"
-      },
       "shortcut": {
         "enabled": true,
         "icon": {

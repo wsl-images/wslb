@@ -20,6 +20,11 @@ const defaultDevcontainerSuperset = `{
     "version": 1,
     "distroName": "WSLBDev",
     "managed": true,
+    "oobe": {
+      "mode": "auto",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
     "state": {
       "mode": "windows-dir",
       "mountPoint": "/home"
@@ -37,10 +42,6 @@ const defaultDevcontainerSuperset = `{
       }
     },
     "distribution": {
-      "oobe": {
-        "defaultName": "dev",
-        "command": "echo 'WSLB OOBE complete'"
-      },
       "shortcut": {
         "enabled": true,
         "icon": {

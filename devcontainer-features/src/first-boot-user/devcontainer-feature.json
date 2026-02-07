@@ -1,0 +1,30 @@
+{
+  "id": "first-boot-user",
+  "version": "1.0.0",
+  "name": "First Boot User",
+  "description": "Ensure a Linux user exists and configure /etc/wsl.conf default user.",
+  "documentationURL": "https://github.com/wsl-images/devcontainer-features/tree/main/src/first-boot-user",
+  "licenseURL": "https://github.com/wsl-images/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "username": {
+      "type": "string",
+      "default": "dev",
+      "description": "Linux username to create/configure."
+    },
+    "userUid": {
+      "type": "string",
+      "default": "1000",
+      "description": "UID for the user."
+    },
+    "userGid": {
+      "type": "string",
+      "default": "1000",
+      "description": "GID for the primary group."
+    },
+    "home": {
+      "type": "string",
+      "default": "/home/dev",
+      "description": "Home directory path."
+    }
+  }
+}

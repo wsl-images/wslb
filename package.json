@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "ps-web-runner": "node tools/ps-web-runner/server.js",
+    "store": "node tools/wslb-store/server.js",
+    "test:store": "node --test tools/wslb-store/test/*.test.js",
     "test:playwright": "npx playwright test -c tests/playwright/playwright.config.js"
   },
   "license": "MIT",

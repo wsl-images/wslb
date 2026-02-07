@@ -29,12 +29,18 @@ Local schema path in this repo:
   "name": "Ubuntu Dev",
   "image": "ubuntu:24.04",
   "features": {
+    "wslb:feature/wsl-prereqs": {},
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },
   "remoteUser": "dev",
   "wslb": {
     "distroName": "UbuntuDev",
     "managed": true,
+    "oobe": {
+      "mode": "auto",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
     "state": {
       "mode": "windows-dir"
     },
@@ -67,6 +73,8 @@ Local schema path in this repo:
 }
 ```
 
+`wslb:feature/wsl-prereqs` is recommended for generic base images (non-WSL-specialized images) to bootstrap user-management prerequisites before OOBE/user provisioning.
+
 ## Convention Defaults
 
 You do not need to repeat many WSL-only values:
@@ -93,10 +101,21 @@ You do not need to repeat many WSL-only values:
 - `[gpu]`: `enabled`
 - `[time]`: `useWindowsTimezone`
 
+`wslb.oobe` controls first-launch behavior when `wslb` manages OOBE:
+
+- `mode`: `auto` | `predefined` | `interactive`
+- `strategy`: `hybrid` | `wslb-only` | `native-only`
+- `promptForPassword`: `true|false`
+
 Legacy compatibility shortcuts:
 
 - `wslconf.systemd` -> `wslconf.boot.systemd`
 - `wslconf.automount: true|false` -> `wslconf.automount.enabled`
+
+Forward-compat passthrough:
+
+- any unknown object under `wslb.wslconf` is emitted as an extra INI section
+- values inside extra sections must be scalar (`string`, `number`, `boolean`)
 
 ## Custom Distro Metadata
 
@@ -114,6 +133,11 @@ Legacy compatibility shortcuts:
   - inline JSON object for the Windows Terminal profile template
   - or string path to a JSON file (resolved relative to the manifest)
 - `windowsTerminal` (camelCase alias for `windowsterminal`; use only one form)
+
+Forward-compat passthrough:
+
+- any unknown object under `wslb.distribution` is emitted as an extra section in `/etc/wsl-distribution.conf`
+- values inside extra sections must be scalar (`string`, `number`, `boolean`)
 
 If an icon is set and no profile template is provided, `wslb` auto-generates a template.
 

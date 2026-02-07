@@ -67,6 +67,9 @@
 - Reliable machine-readable SVG fetch endpoint used in implementation:
   - `https://simpleicons.org/icons/<slug>.svg`
   - https://simpleicons.org
+- Reliable machine-readable slug index used by Store icon search:
+  - `https://raw.githubusercontent.com/simple-icons/simple-icons/develop/slugs.md`
+  - https://github.com/simple-icons/simple-icons
 
 ## 4) Key Design Decisions
 
@@ -110,3 +113,67 @@
   - both JSON and JSONC are accepted.
   - schema file provided at `schemas/wslb-workspace.schema.json` with raw GitHub URL for `$schema` association.
 - Feature tool availability is now verified during install/upgrade for selected feature refs (`node`, `go`, `python`, `git`, `github-cli`).
+
+## 7) OOBE and Distro Compatibility Expansion
+
+- Added first-class `wslb.oobe` config:
+  - `mode`: `auto | predefined | interactive`
+  - `strategy`: `hybrid | wslb-only | native-only`
+  - `promptForPassword`: bool
+- `interactive` mode no longer auto-writes `wslconf.user.default` and no longer forces default-user verification.
+- Managed mount ownership now resolves runtime UID/GID from the actual created user in the distro, preventing UID drift issues when base images already occupy UID 1000.
+- `ensureDistroDefaultUser` now hard-fails if user creation does not succeed (instead of silently continuing).
+
+## 8) Forward-Compatible Config Coverage
+
+- Added pass-through section support so users can control additional config keys without waiting for code changes:
+  - unknown object sections under `wslb.wslconf` are emitted into `/etc/wsl.conf`
+  - unknown object sections under `wslb.distribution` are emitted into `/etc/wsl-distribution.conf`
+- Validation enforces scalar values (`string|number|boolean`) for pass-through section keys.
+
+## 9) Verification Added
+
+- Added docker-backed official distro matrix test:
+  - `internal/targets/wsl/oobe_matrix_test.go`
+  - gated by `WSLB_OOBE_MATRIX=1`
+  - runs OOBE smoke checks across latest official `wsl-images` images.
+- Added wrapper script and report generator:
+  - `scripts/oobe-matrix.ps1`
+  - writes `wsl-images-oobe-matrix-report.json`
+- Added OS-agnostic internal feature for generic distro bases:
+  - `wslb:feature/wsl-prereqs`
+  - installs/bootstrap user-management prerequisites across apt/dnf/yum/microdnf/apk/zypper/pacman/xbps/tdnf ecosystems
+  - provides `getent` fallback shim when missing.
+- Added second matrix for broad distro base-image compatibility:
+  - `internal/targets/wsl/base_image_matrix_test.go`
+  - `scripts/base-image-matrix.ps1`
+  - writes `base-image-matrix-report.json`
+- Verified current run locally:
+  - `go test ./...` passes
+  - `scripts/e2e.ps1` pass (install/upgrade/rollback sentinel preservation)
+  - OOBE matrix pass against 19 official `wsl-images` entries.
+
+Additional references used for this pass:
+- Official WSL images package catalog:
+  - https://github.com/orgs/wsl-images/packages?repo_name=images
+
+## 10) Store UI (Local App) for Multi-Distro Profile Management
+
+- Added `tools/wslb-store` as a local Store-style web app backed by `wslb` CLI APIs.
+- The Store persists multiple profiles (`.wslb-store/profiles/*.json`) and user defaults (`.wslb-store/defaults.json`).
+- Each profile maps to a devcontainer superset manifest and can write its own manifest path (for example `.devcontainer/ubuntu-dev.json`), enabling multiple distro configurations side-by-side.
+- The Store executes lifecycle actions through CLI JSON contracts:
+  - `workspace validate|plan|build`
+  - `wsl state create|install|upgrade|rollback|status`
+  - `doctor`
+- Added feature catalog search sourced from the official containers.dev feature registry page.
+- Added parser tests for feature index extraction.
+
+### Source-backed facts for Store decisions
+
+- Ubuntu App Center repository is Flutter-based, so it is a UX reference rather than a drop-in web codebase for this Node/Windows local tooling context.
+  - https://github.com/ubuntu/app-center
+- `containers.dev/features` exposes the authoritative, continuously-updated feature listing and references for devcontainer feature discovery.
+  - https://containers.dev/features
+- Dev Container feature semantics used by UI assumptions (feature references, options, dependency ordering) come from the Dev Container Features specification.
+  - https://containers.dev/implementors/features/

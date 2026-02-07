@@ -304,8 +304,10 @@ func configureWSLForDistro(ctx context.Context, manifestPath string, image works
 	if err := applyGlobalWSLConfig(ctx, image); err != nil {
 		return err
 	}
-	if err := ensureDistroDefaultUser(ctx, image, distro); err != nil {
-		return err
+	if shouldEnsureDefaultUser(image) {
+		if err := ensureDistroDefaultUser(ctx, image, distro); err != nil {
+			return err
+		}
 	}
 
 	wslConf := renderWSLConf(image)
@@ -343,10 +345,11 @@ func configureWSLForDistro(ctx context.Context, manifestPath string, image works
 func renderWSLConf(image workspace.Image) string {
 	cfg := image.WSL.WSLConf
 	defaultUser := image.WSL.DefaultUser.Name
-	if cfg.User == nil {
+	effectiveMode := workspace.EffectiveOOBEMode(image.WSL)
+	if cfg.User == nil && strings.TrimSpace(defaultUser) != "" && effectiveMode != workspace.OOBEModeInteractive {
 		cfg.User = &workspace.WSLConfUser{}
 	}
-	if strings.TrimSpace(cfg.User.Default) == "" {
+	if cfg.User != nil && strings.TrimSpace(cfg.User.Default) == "" && effectiveMode != workspace.OOBEModeInteractive {
 		cfg.User.Default = defaultUser
 	}
 	if cfg.Boot == nil {
@@ -369,8 +372,10 @@ func renderWSLConf(image workspace.Image) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("[user]\n")
-	b.WriteString("default=" + cfg.User.Default + "\n")
+	if cfg.User != nil && strings.TrimSpace(cfg.User.Default) != "" {
+		b.WriteString("[user]\n")
+		b.WriteString("default=" + cfg.User.Default + "\n")
+	}
 	b.WriteString("[boot]\n")
 	b.WriteString("systemd=" + boolToString(*cfg.Boot.Systemd) + "\n")
 	if strings.TrimSpace(cfg.Boot.Command) != "" {
@@ -423,6 +428,32 @@ func renderWSLConf(image workspace.Image) string {
 	if cfg.Time != nil && cfg.Time.UseWindowsTimezone != nil {
 		b.WriteString("[time]\n")
 		b.WriteString("useWindowsTimezone=" + boolToString(*cfg.Time.UseWindowsTimezone) + "\n")
+	}
+	if len(cfg.ExtraSections) > 0 {
+		sectionNames := make([]string, 0, len(cfg.ExtraSections))
+		for section := range cfg.ExtraSections {
+			sectionNames = append(sectionNames, section)
+		}
+		sort.Strings(sectionNames)
+		for _, section := range sectionNames {
+			kv := cfg.ExtraSections[section]
+			if len(kv) == 0 {
+				continue
+			}
+			b.WriteString("[" + section + "]\n")
+			keys := make([]string, 0, len(kv))
+			for k := range kv {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				val, err := renderWSLGlobalValue(kv[key])
+				if err != nil {
+					continue
+				}
+				b.WriteString(key + "=" + val + "\n")
+			}
+		}
 	}
 	return b.String()
 }
@@ -556,17 +587,24 @@ func ensureDistroDefaultUser(ctx context.Context, image workspace.Image, distro 
 	}
 	home := managedUserHome(homeBase, u)
 	cmdText := fmt.Sprintf(
-		`set -eu; u=%s; target_uid=%d; target_gid=%d; `+
-			`if ! getent group "$target_gid" >/dev/null 2>&1; then groupadd -g "$target_gid" "$u" || true; fi; `+
-			`if ! id -u "$u" >/dev/null 2>&1; then useradd -m -u "$target_uid" -g "$target_gid" -s /bin/bash "$u" || useradd -m -s /bin/bash "$u" || true; fi; `+
-			`uid="$(id -u "$u" 2>/dev/null || echo "$target_uid")"; gid="$(id -g "$u" 2>/dev/null || echo "$target_gid")"; `+
-			`mkdir -p %s; chown -R "$uid:$gid" %s || true`,
-		shQuote(u), uid, gid, shQuote(home), shQuote(home),
+		`set -eu; `+
+			`if ! getent group %d >/dev/null 2>&1; then groupadd -g %d %s || true; fi; `+
+			`if ! id -u %s >/dev/null 2>&1; then useradd -m -u %d -g %d -s /bin/bash %s || useradd -m -s /bin/bash %s || true; fi; `+
+			`id -u %s >/dev/null 2>&1 || { echo "failed to create user %s" >&2; exit 44; }; `+
+			`mkdir -p %s; chown -R "$(id -u %s):$(id -g %s)" %s || true`,
+		gid, gid, shQuote(u), shQuote(u), uid, gid, shQuote(u), shQuote(u), shQuote(u), u, shQuote(home), shQuote(u), shQuote(u), shQuote(home),
 	)
 	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmdText); err != nil {
 		return fmt.Errorf("failed to ensure default user %s: %w", u, err)
 	}
 	return nil
+}
+
+func shouldEnsureDefaultUser(image workspace.Image) bool {
+	if image.WSL == nil {
+		return false
+	}
+	return workspace.EffectiveOOBEMode(image.WSL) != workspace.OOBEModeInteractive
 }
 
 func boolToString(v bool) string {
@@ -590,13 +628,15 @@ func verifyDistro(ctx context.Context, image workspace.Image, distro string) (bo
 			return false, err
 		}
 	}
-	userHome := managedUserHome("/home", image.WSL.DefaultUser.Name)
-	if image.WSL.State != nil && image.WSL.State.MountPoint != "" {
-		userHome = managedUserHome(image.WSL.State.MountPoint, image.WSL.DefaultUser.Name)
-	}
-	userCheck := fmt.Sprintf("set -eu; mkdir -p %q; touch %q/.wslb-user-verify; cat %q/.wslb-user-verify >/dev/null", userHome, userHome, userHome)
-	if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", image.WSL.DefaultUser.Name, "--", "sh", "-lc", userCheck); err != nil {
-		return false, err
+	if shouldEnsureDefaultUser(image) {
+		userHome := managedUserHome("/home", image.WSL.DefaultUser.Name)
+		if image.WSL.State != nil && image.WSL.State.MountPoint != "" {
+			userHome = managedUserHome(image.WSL.State.MountPoint, image.WSL.DefaultUser.Name)
+		}
+		userCheck := fmt.Sprintf("set -eu; mkdir -p %q; touch %q/.wslb-user-verify; cat %q/.wslb-user-verify >/dev/null", userHome, userHome, userHome)
+		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", image.WSL.DefaultUser.Name, "--", "sh", "-lc", userCheck); err != nil {
+			return false, err
+		}
 	}
 	tools := expectedFeatureTools(image)
 	if len(tools) > 0 {
@@ -651,16 +691,25 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 	}
 	dstEsc := strings.ReplaceAll(dst, " ", `\040`)
 	userName := strings.TrimSpace(image.WSL.DefaultUser.Name)
-	if userName == "" {
-		userName = "dev"
-	}
 	uid := image.WSL.DefaultUser.UID
 	gid := image.WSL.DefaultUser.GID
+	if userName != "" {
+		resolvedUID, resolvedGID, err := lookupDistroUserIDs(ctx, distro, userName)
+		if err == nil {
+			uid = resolvedUID
+			gid = resolvedGID
+		}
+	}
 	if uid == 0 {
 		uid = 1000
 	}
 	if gid == 0 {
 		gid = 1000
+	}
+	ownerCmd := ""
+	if userName != "" {
+		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
+		ownerCmd = fmt.Sprintf("; mkdir -p %s; chown %d:%d %s || true", shQuote(userHome), uid, gid, shQuote(userHome))
 	}
 
 	switch image.WSL.State.Mode {
@@ -672,16 +721,13 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 		}
 		srcEsc := strings.ReplaceAll(windowsSrc, " ", `\040`)
 		mountOpts := fmt.Sprintf("metadata,uid=%d,gid=%d", uid, gid)
-		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
 			`set -eu; if [ ! -d %q ]; then echo "state source does not exist: %s" >&2; exit 21; fi; `+
-				`u=%s; `+
 				`mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; `+
 				`echo '%s %s drvfs %s 0 0 # wslb-state' >> /etc/fstab; `+
 				`mountpoint -q %q || mount -a || mount -t drvfs %q %q -o %s; `+
-				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }; `+
-				`mkdir -p %q; chown %d:%d %q || true`,
-			linuxSrc, windowsSrc, shQuote(userName), dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst, userHome, uid, gid, userHome,
+				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }%s`,
+			linuxSrc, windowsSrc, dst, srcEsc, dstEsc, mountOpts, dst, windowsSrc, dst, mountOpts, dst, dst, ownerCmd,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -693,16 +739,13 @@ func configureManagedStateMount(ctx context.Context, distro string, image worksp
 			return err
 		}
 		srcEsc := strings.ReplaceAll(src, " ", `\040`)
-		userHome := managedUserHome(dst, image.WSL.DefaultUser.Name)
 		cmd := fmt.Sprintf(
 			`set -eu; if [ ! -d %q ]; then echo "state source does not exist: %s" >&2; exit 21; fi; `+
-				`u=%s; `+
 				`mkdir -p %q; if [ -f /etc/fstab ]; then grep -v ' # wslb-state$' /etc/fstab > /etc/fstab.wslb || true; else : > /etc/fstab.wslb; fi; mv /etc/fstab.wslb /etc/fstab; `+
 				`echo '%s %s none bind 0 0 # wslb-state' >> /etc/fstab; `+
 				`mountpoint -q %q || mount -a || mount --bind %q %q; `+
-				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }; `+
-				`mkdir -p %q; chown %d:%d %q || true`,
-			src, src, shQuote(userName), dst, srcEsc, dstEsc, dst, src, dst, dst, dst, userHome, uid, gid, userHome,
+				`mountpoint -q %q || { echo "managed state mount not active at %s" >&2; exit 22; }%s`,
+			src, src, dst, srcEsc, dstEsc, dst, src, dst, dst, dst, ownerCmd,
 		)
 		if _, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd); err != nil {
 			return fmt.Errorf("failed to configure managed state mount: %w", err)
@@ -754,12 +797,37 @@ func managedUserHome(mountPoint, user string) string {
 	}
 	u := strings.TrimSpace(user)
 	if u == "" {
-		u = "dev"
+		return mp
 	}
 	if mp == "/" {
 		return "/" + u
 	}
 	return strings.TrimRight(mp, "/") + "/" + u
+}
+
+func lookupDistroUserIDs(ctx context.Context, distro, user string) (int, int, error) {
+	u := strings.TrimSpace(user)
+	if u == "" {
+		return 0, 0, fmt.Errorf("user is required")
+	}
+	cmd := fmt.Sprintf("set -eu; id -u %s; id -g %s", shQuote(u), shQuote(u))
+	out, err := runCombined(ctx, "wsl", "-d", distro, "-u", "root", "--", "sh", "-lc", cmd)
+	if err != nil {
+		return 0, 0, err
+	}
+	lines := strings.Fields(strings.TrimSpace(out))
+	if len(lines) < 2 {
+		return 0, 0, fmt.Errorf("unexpected id output: %q", strings.TrimSpace(out))
+	}
+	uid, err := strconv.Atoi(lines[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	gid, err := strconv.Atoi(lines[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return uid, gid, nil
 }
 
 func windowsPathToWSLArg(path string) string {

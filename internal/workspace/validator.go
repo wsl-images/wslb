@@ -70,14 +70,64 @@ func Validate(m *Manifest, manifestPath string) ValidationResult {
 			if img.WSL.InstallDir == "" {
 				issues = append(issues, ValidationIssue{Path: prefix + ".wsl.installDir", Code: "WSLB_WSL_INSTALLDIR_REQUIRED", Message: "wsl.installDir is required"})
 			}
-			if img.WSL.DefaultUser.Name == "" {
+			effectiveMode := EffectiveOOBEMode(img.WSL)
+			if effectiveMode == OOBEModePredefined && strings.TrimSpace(img.WSL.DefaultUser.Name) == "" {
 				issues = append(issues, ValidationIssue{Path: prefix + ".wsl.defaultUser.name", Code: "WSLB_WSL_DEFAULTUSER_REQUIRED", Message: "default user name is required"})
+			}
+			if img.WSL.OOBE != nil {
+				mode := strings.ToLower(strings.TrimSpace(img.WSL.OOBE.Mode))
+				if mode != "" && mode != OOBEModeAuto && mode != OOBEModePredefined && mode != OOBEModeInteractive {
+					issues = append(issues, ValidationIssue{
+						Path:        prefix + ".wsl.oobe.mode",
+						Code:        "WSLB_WSL_OOBE_MODE_INVALID",
+						Message:     "oobe.mode must be one of auto|predefined|interactive",
+						Remediation: "set oobe.mode to auto, predefined, or interactive",
+					})
+				}
+				strategy := strings.ToLower(strings.TrimSpace(img.WSL.OOBE.Strategy))
+				if strategy != "" && strategy != OOBEStrategyHybrid && strategy != OOBEStrategyWSLBOnly && strategy != OOBEStrategyNative {
+					issues = append(issues, ValidationIssue{
+						Path:        prefix + ".wsl.oobe.strategy",
+						Code:        "WSLB_WSL_OOBE_STRATEGY_INVALID",
+						Message:     "oobe.strategy must be one of hybrid|wslb-only|native-only",
+						Remediation: "set oobe.strategy to hybrid, wslb-only, or native-only",
+					})
+				}
 			}
 			if img.WSL.WSLConf.User != nil && strings.TrimSpace(img.WSL.WSLConf.User.Default) == "" {
 				issues = append(issues, ValidationIssue{Path: prefix + ".wsl.wslconf.user.default", Code: "WSLB_WSLCONF_DEFAULTUSER_REQUIRED", Message: "wslconf.user.default cannot be empty when user section is provided"})
 			}
+			if effectiveMode == OOBEModeInteractive && img.WSL.WSLConf.User != nil && strings.TrimSpace(img.WSL.WSLConf.User.Default) != "" {
+				issues = append(issues, ValidationIssue{
+					Path:        prefix + ".wsl.wslconf.user.default",
+					Code:        "WSLB_WSLCONF_DEFAULTUSER_CONFLICT",
+					Message:     "interactive oobe mode conflicts with wslconf.user.default",
+					Remediation: "remove wslconf.user.default or switch oobe.mode to predefined",
+				})
+			}
 			if img.WSL.Managed && img.WSL.State == nil {
 				issues = append(issues, ValidationIssue{Path: prefix + ".wsl.state", Code: "WSLB_WSL_STATE_REQUIRED", Message: "managed WSL requires state config"})
+			}
+			for section, kv := range img.WSL.WSLConf.ExtraSections {
+				if strings.TrimSpace(section) == "" {
+					issues = append(issues, ValidationIssue{
+						Path:        prefix + ".wsl.wslconf",
+						Code:        "WSLB_WSLCONF_SECTION_INVALID",
+						Message:     "wslconf extra section name cannot be empty",
+						Remediation: "rename section to a non-empty identifier",
+					})
+					continue
+				}
+				for key, value := range kv {
+					if !isScalarConfigValue(value) {
+						issues = append(issues, ValidationIssue{
+							Path:        fmt.Sprintf("%s.wsl.wslconf.%s.%s", prefix, section, key),
+							Code:        "WSLB_WSLCONF_VALUE_INVALID",
+							Message:     "wslconf section values must be string/number/boolean",
+							Remediation: "replace nested objects/arrays with scalar values",
+						})
+					}
+				}
 			}
 			if img.WSL.State != nil {
 				if img.WSL.State.Mode != "vhdx" && img.WSL.State.Mode != "windows-dir" {
@@ -150,6 +200,29 @@ func Validate(m *Manifest, manifestPath string) ValidationResult {
 						Message:     "shortcut enabled expects icon.path or icon.simpleIcon",
 						Remediation: "set distribution.shortcut.icon.path to an .ico file or icon.simpleIcon to a Simple Icons slug",
 					})
+				}
+			}
+			if img.WSL.Distribution != nil {
+				for section, kv := range img.WSL.Distribution.ExtraSections {
+					if strings.TrimSpace(section) == "" {
+						issues = append(issues, ValidationIssue{
+							Path:        prefix + ".wsl.distribution",
+							Code:        "WSLB_DISTRIBUTION_SECTION_INVALID",
+							Message:     "distribution extra section name cannot be empty",
+							Remediation: "rename section to a non-empty identifier",
+						})
+						continue
+					}
+					for key, value := range kv {
+						if !isScalarConfigValue(value) {
+							issues = append(issues, ValidationIssue{
+								Path:        fmt.Sprintf("%s.wsl.distribution.%s.%s", prefix, section, key),
+								Code:        "WSLB_DISTRIBUTION_VALUE_INVALID",
+								Message:     "distribution section values must be string/number/boolean",
+								Remediation: "replace nested objects/arrays with scalar values",
+							})
+						}
+					}
 				}
 			}
 		}

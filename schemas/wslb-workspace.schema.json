@@ -121,6 +121,9 @@
           "$ref": "#/$defs/user",
           "description": "Legacy alias for user."
         },
+        "oobe": {
+          "$ref": "#/$defs/wslb_oobe"
+        },
         "state": {
           "$ref": "#/$defs/state"
         },
@@ -132,6 +135,38 @@
         },
         "distribution": {
           "$ref": "#/$defs/distribution"
+        }
+      }
+    },
+    "wslb_oobe": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "WSLB-managed OOBE strategy for first launch.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "predefined",
+            "interactive"
+          ],
+          "default": "auto",
+          "description": "auto uses predefined when user.name exists, otherwise interactive."
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "hybrid",
+            "wslb-only",
+            "native-only"
+          ],
+          "default": "hybrid",
+          "description": "hybrid preserves and chains native distro OOBE when available."
+        },
+        "promptForPassword": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, prompt to set the Linux password during OOBE."
         }
       }
     },
@@ -186,9 +221,11 @@
     },
     "wslconf": {
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": {
+        "$ref": "#/$defs/wslconf_extra_section"
+      },
       "description": "Per-distro /etc/wsl.conf settings. This mirrors Microsoft wsl.conf sections.",
-      "markdownDescription": "Maps to `/etc/wsl.conf`. Supported sections/keys include:\n- `[user] default`\n- `[boot] systemd, command, protectBinfmt`\n- `[automount] enabled, root, options, mountFsTab, crossDistro`\n- `[network] hostname, generateHosts, generateResolvConf`\n- `[interop] enabled, appendWindowsPath`\n- `[gpu] enabled`\n- `[time] useWindowsTimezone`\n\nLegacy shortcuts are also supported:\n- `wslconf.systemd` -> `wslconf.boot.systemd`\n- `wslconf.automount: true|false` -> `wslconf.automount.enabled`",
+      "markdownDescription": "Maps to `/etc/wsl.conf`. Supported sections/keys include:\n- `[user] default`\n- `[boot] systemd, command, protectBinfmt`\n- `[automount] enabled, root, options, mountFsTab, crossDistro`\n- `[network] hostname, generateHosts, generateResolvConf`\n- `[interop] enabled, appendWindowsPath`\n- `[gpu] enabled`\n- `[time] useWindowsTimezone`\n\nLegacy shortcuts are also supported:\n- `wslconf.systemd` -> `wslconf.boot.systemd`\n- `wslconf.automount: true|false` -> `wslconf.automount.enabled`\n\nAny additional unknown section is passed through as an INI section object with scalar values.",
       "properties": {
         "systemd": {
           "type": "boolean",
@@ -223,6 +260,23 @@
         "time": {
           "$ref": "#/$defs/wslconf_time"
         }
+      }
+    },
+    "wslconf_extra_section": {
+      "type": "object",
+      "description": "Additional pass-through wsl.conf section.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
       }
     },
     "wslconf_user": {
@@ -357,7 +411,9 @@
     },
     "distribution": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": {
+        "$ref": "#/$defs/distribution_extra_section"
+      },
       "description": "Settings written to /etc/wsl-distribution.conf.",
       "properties": {
         "oobe": {
@@ -373,6 +429,23 @@
           "$ref": "#/$defs/distribution_windowsterminal",
           "description": "Alias for windowsterminal (camelCase-friendly for devcontainer.json). Use only one."
         }
+      }
+    },
+    "distribution_extra_section": {
+      "type": "object",
+      "description": "Additional pass-through /etc/wsl-distribution.conf section.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
       }
     },
     "distribution_oobe": {
@@ -479,12 +552,18 @@
       "name": "Ubuntu Dev",
       "image": "ubuntu:24.04",
       "features": {
+        "wslb:feature/wsl-prereqs": {},
         "ghcr.io/devcontainers/features/common-utils:2": {}
       },
       "remoteUser": "dev",
       "wslb": {
         "distroName": "UbuntuDev",
         "managed": true,
+        "oobe": {
+          "mode": "auto",
+          "strategy": "hybrid",
+          "promptForPassword": true
+        },
         "state": {
           "mode": "windows-dir"
         },
@@ -502,9 +581,6 @@
           }
         },
         "distribution": {
-          "oobe": {
-            "defaultName": "dev"
-          },
           "shortcut": {
             "enabled": true,
             "icon": {

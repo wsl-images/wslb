@@ -3,12 +3,18 @@
   "name": "WSLB Managed VHDX",
   "image": "ubuntu:24.04",
   "features": {
+    "wslb:feature/wsl-prereqs": {},
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },
   "remoteUser": "dev",
   "wslb": {
     "distroName": "ManagedVHDX",
     "managed": true,
+    "oobe": {
+      "mode": "predefined",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
     "state": {
       "mode": "vhdx",
       "path": "./state/managed-vhdx.vhdx",

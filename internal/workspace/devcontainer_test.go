@@ -354,3 +354,75 @@ func TestLoadFallsBackToJSONC(t *testing.T) {
 		t.Fatalf("images=%d", len(m.Images))
 	}
 }
+
+func TestParseDevcontainerSupersetInteractiveOOBE(t *testing.T) {
+	jsonText := `{
+  "name": "Interactive OOBE",
+  "image": "ubuntu:24.04",
+  "wslb": {
+    "oobe": {
+      "mode": "interactive",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
+    "wslconf": {
+      "boot": {
+        "systemd": true
+      }
+    }
+  }
+}`
+	m, err := ParseDevcontainerSuperset([]byte(jsonText), filepath.Join(t.TempDir(), "devcontainer.json"))
+	if err != nil {
+		t.Fatalf("ParseDevcontainerSuperset failed: %v", err)
+	}
+	img := m.Images[0]
+	if img.WSL == nil || img.WSL.OOBE == nil {
+		t.Fatalf("expected wsl.oobe config")
+	}
+	if img.WSL.OOBE.Mode != OOBEModeInteractive {
+		t.Fatalf("oobe.mode=%q", img.WSL.OOBE.Mode)
+	}
+	if img.WSL.WSLConf.User != nil && img.WSL.WSLConf.User.Default != "" {
+		t.Fatalf("interactive mode should not auto-populate wslconf.user.default")
+	}
+}
+
+func TestParseDevcontainerSupersetPassThroughSections(t *testing.T) {
+	jsonText := `{
+  "name": "Pass Through",
+  "image": "ubuntu:24.04",
+  "wslb": {
+    "wslconf": {
+      "boot": { "systemd": true },
+      "customSection": {
+        "foo": "bar",
+        "enabled": true
+      }
+    },
+    "distribution": {
+      "shortcut": {
+        "enabled": true,
+        "icon": { "simpleIcon": "ubuntu" }
+      },
+      "customDistro": {
+        "flag": true
+      }
+    }
+  }
+}`
+	m, err := ParseDevcontainerSuperset([]byte(jsonText), filepath.Join(t.TempDir(), "devcontainer.json"))
+	if err != nil {
+		t.Fatalf("ParseDevcontainerSuperset failed: %v", err)
+	}
+	img := m.Images[0]
+	if img.WSL == nil {
+		t.Fatalf("expected wsl config")
+	}
+	if img.WSL.WSLConf.ExtraSections == nil || img.WSL.WSLConf.ExtraSections["customSection"]["foo"] != "bar" {
+		t.Fatalf("expected wslconf custom section passthrough")
+	}
+	if img.WSL.Distribution == nil || img.WSL.Distribution.ExtraSections == nil || img.WSL.Distribution.ExtraSections["customDistro"]["flag"] != true {
+		t.Fatalf("expected distribution custom section passthrough")
+	}
+}

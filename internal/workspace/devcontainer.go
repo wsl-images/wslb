@@ -37,6 +37,7 @@ type DevcontainerWSLB struct {
 	Managed        *bool                  `json:"managed,omitempty"`
 	User           *WSLDefaultUser        `json:"user,omitempty"`
 	DefaultUser    *WSLDefaultUser        `json:"defaultUser,omitempty"`
+	OOBE           *WSLOOBEConfig         `json:"oobe,omitempty"`
 	State          *WSLStateConfig        `json:"state,omitempty"`
 	WSLConf        *WSLConfConfig         `json:"wslconf,omitempty"`
 	WSLConfig      *WSLGlobalConfig       `json:"wslconfig,omitempty"`
@@ -88,21 +89,39 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 	if userName == "" {
 		userName = strings.TrimSpace(dc.ContainerUser)
 	}
-	if userName == "" {
-		userName = "dev"
+
+	oobeCfg := NormalizeOOBEConfig(nil)
+	if wslb != nil {
+		oobeCfg = NormalizeOOBEConfig(wslb.OOBE)
 	}
-	defaultUser := WSLDefaultUser{Name: userName, UID: 1000, GID: 1000}
+
+	defaultUser := WSLDefaultUser{UID: 1000, GID: 1000}
+	explicitUser := false
 	if wslb != nil {
 		if wslb.User != nil {
 			defaultUser = *wslb.User
+			explicitUser = true
 		}
 		if wslb.DefaultUser != nil {
 			// Legacy field support.
 			defaultUser = *wslb.DefaultUser
+			explicitUser = true
 		}
 	}
-	if strings.TrimSpace(defaultUser.Name) == "" {
+
+	mode := oobeCfg.Mode
+	if mode == "" {
+		mode = OOBEModeAuto
+	}
+	if !explicitUser && mode != OOBEModeInteractive && strings.TrimSpace(userName) != "" {
 		defaultUser.Name = userName
+	}
+	if mode == OOBEModePredefined && strings.TrimSpace(defaultUser.Name) == "" {
+		if strings.TrimSpace(userName) != "" {
+			defaultUser.Name = userName
+		} else {
+			defaultUser.Name = "dev"
+		}
 	}
 	if defaultUser.UID == 0 {
 		defaultUser.UID = 1000
@@ -137,9 +156,9 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 
 	wslconf := DefaultWSLConfConfig()
 	if wslb != nil && wslb.WSLConf != nil {
-		wslconf = normalizeWSLConf(*wslb.WSLConf, defaultUser.Name)
+		wslconf = normalizeWSLConf(*wslb.WSLConf, defaultUser.Name, EffectiveOOBEMode(&WSLImageConfig{DefaultUser: defaultUser, OOBE: oobeCfg}))
 	} else {
-		wslconf = normalizeWSLConf(wslconf, defaultUser.Name)
+		wslconf = normalizeWSLConf(wslconf, defaultUser.Name, EffectiveOOBEMode(&WSLImageConfig{DefaultUser: defaultUser, OOBE: oobeCfg}))
 	}
 
 	displayName := workspaceName
@@ -190,10 +209,11 @@ func ParseDevcontainerSuperset(data []byte, manifestPath string) (*Manifest, err
 					DistroName:   distroName,
 					InstallDir:   installDir,
 					DefaultUser:  defaultUser,
+					OOBE:         oobeCfg,
 					State:        state,
 					WSLConf:      wslconf,
 					WSLConfig:    wslGlobalConfig,
-					Distribution: normalizeDistribution(wslb, defaultUser),
+					Distribution: normalizeDistribution(wslb, defaultUser, oobeCfg),
 					Features:     features,
 				},
 			},
@@ -228,7 +248,7 @@ func mergeStateConfig(def, custom *WSLStateConfig) *WSLStateConfig {
 	return &out
 }
 
-func normalizeDistribution(wslb *DevcontainerWSLB, defaultUser WSLDefaultUser) *WSLDistributionConfig {
+func normalizeDistribution(wslb *DevcontainerWSLB, defaultUser WSLDefaultUser, oobeCfg *WSLOOBEConfig) *WSLDistributionConfig {
 	if wslb == nil || wslb.Distribution == nil {
 		return nil
 	}
@@ -236,7 +256,11 @@ func normalizeDistribution(wslb *DevcontainerWSLB, defaultUser WSLDefaultUser) *
 	if dist.OOBE == nil {
 		dist.OOBE = &WSLDistributionOOBE{}
 	}
-	if strings.TrimSpace(dist.OOBE.DefaultName) == "" {
+	mode := OOBEModePredefined
+	if oobeCfg != nil {
+		mode = strings.ToLower(strings.TrimSpace(oobeCfg.Mode))
+	}
+	if mode != OOBEModeInteractive && strings.TrimSpace(dist.OOBE.DefaultName) == "" && strings.TrimSpace(defaultUser.Name) != "" {
 		dist.OOBE.DefaultName = defaultUser.Name
 	}
 	if dist.Shortcut != nil && dist.Shortcut.Enabled == nil {
@@ -246,12 +270,12 @@ func normalizeDistribution(wslb *DevcontainerWSLB, defaultUser WSLDefaultUser) *
 	return &dist
 }
 
-func normalizeWSLConf(cfg WSLConfConfig, defaultUser string) WSLConfConfig {
+func normalizeWSLConf(cfg WSLConfConfig, defaultUser string, oobeMode string) WSLConfConfig {
 	out := cfg
-	if out.User == nil {
+	if out.User == nil && strings.TrimSpace(defaultUser) != "" {
 		out.User = &WSLConfUser{}
 	}
-	if strings.TrimSpace(out.User.Default) == "" {
+	if out.User != nil && strings.TrimSpace(out.User.Default) == "" && strings.TrimSpace(defaultUser) != "" && strings.ToLower(strings.TrimSpace(oobeMode)) != OOBEModeInteractive {
 		out.User.Default = defaultUser
 	}
 	if out.Boot == nil {

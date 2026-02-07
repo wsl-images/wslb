@@ -244,3 +244,103 @@ func TestValidateWSLConfigRequiresScalarValues(t *testing.T) {
 		t.Fatalf("expected WSLB_WSLCONFIG_VALUE_INVALID issue, got: %+v", res.Issues)
 	}
 }
+
+func TestValidateWSLConfExtraSectionRequiresScalarValues(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Workspace: WorkspaceConfig{
+			Name:      "demo",
+			OutputDir: "./.wslb-out",
+		},
+		Images: []Image{
+			{
+				ID:     "img",
+				Target: "wsl",
+				Base:   "ubuntu:24.04",
+				WSL: &WSLImageConfig{
+					Managed:    false,
+					DistroName: "Demo",
+					InstallDir: "./distros/demo",
+					DefaultUser: WSLDefaultUser{
+						Name: "dev",
+						UID:  1000,
+						GID:  1000,
+					},
+					WSLConf: WSLConfConfig{
+						Boot: &WSLConfBoot{Systemd: boolPtr(true)},
+						ExtraSections: map[string]map[string]interface{}{
+							"custom": {
+								"nested": map[string]interface{}{"bad": true},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	res := Validate(m, filepath.Join(t.TempDir(), "devcontainer.json"))
+	if res.Valid {
+		t.Fatalf("expected invalid result")
+	}
+	found := false
+	for _, i := range res.Issues {
+		if i.Code == "WSLB_WSLCONF_VALUE_INVALID" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected WSLB_WSLCONF_VALUE_INVALID issue, got: %+v", res.Issues)
+	}
+}
+
+func TestValidateDistributionExtraSectionRequiresScalarValues(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Workspace: WorkspaceConfig{
+			Name:      "demo",
+			OutputDir: "./.wslb-out",
+		},
+		Images: []Image{
+			{
+				ID:     "img",
+				Target: "wsl",
+				Base:   "ubuntu:24.04",
+				WSL: &WSLImageConfig{
+					Managed:    false,
+					DistroName: "Demo",
+					InstallDir: "./distros/demo",
+					DefaultUser: WSLDefaultUser{
+						Name: "dev",
+						UID:  1000,
+						GID:  1000,
+					},
+					WSLConf: DefaultWSLConfConfig(),
+					Distribution: &WSLDistributionConfig{
+						ExtraSections: map[string]map[string]interface{}{
+							"custom": {
+								"nested": map[string]interface{}{"bad": true},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	res := Validate(m, filepath.Join(t.TempDir(), "devcontainer.json"))
+	if res.Valid {
+		t.Fatalf("expected invalid result")
+	}
+	found := false
+	for _, i := range res.Issues {
+		if i.Code == "WSLB_DISTRIBUTION_VALUE_INVALID" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected WSLB_DISTRIBUTION_VALUE_INVALID issue, got: %+v", res.Issues)
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }

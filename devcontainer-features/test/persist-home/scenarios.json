@@ -1,0 +1,12 @@
+{
+  "default": {
+    "image": "ubuntu:24.04",
+    "features": {
+      "persist-home": {
+        "mountPoint": "/home",
+        "stateSource": "/mnt/wsl/wslb-state",
+        "systemd": true
+      }
+    }
+  }
+}

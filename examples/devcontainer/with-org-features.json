@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/wsl-images/wslb/main/schemas/wslb-workspace.schema.json",
+  "name": "Ubuntu (wsl-images feature collection)",
+  "image": "ubuntu:24.04",
+  "features": {
+    "ghcr.io/wsl-images/devcontainer-features/wsl-prereqs:1": {},
+    "ghcr.io/wsl-images/devcontainer-features/first-boot-user:1": {
+      "username": "dev",
+      "home": "/home/dev"
+    },
+    "ghcr.io/wsl-images/devcontainer-features/persist-home:1": {
+      "mountPoint": "/home",
+      "stateSource": "/mnt/wsl/wslb-state",
+      "systemd": true
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "remoteUser": "dev",
+  "wslb": {
+    "version": 1,
+    "id": "ubuntu-org-features",
+    "distroName": "UbuntuOrgFeatures",
+    "managed": true,
+    "state": {
+      "mode": "windows-dir",
+      "mountPoint": "/home"
+    },
+    "wslconf": {
+      "boot": {
+        "systemd": true
+      }
+    },
+    "distribution": {
+      "shortcut": {
+        "enabled": true,
+        "icon": {
+          "simpleIcon": "ubuntu",
+          "color": "E95420",
+          "style": "flat"
+        }
+      },
+      "windowsterminal": {
+        "enabled": true
+      }
+    }
+  }
+}

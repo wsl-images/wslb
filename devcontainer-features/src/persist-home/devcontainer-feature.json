@@ -1,0 +1,25 @@
+{
+  "id": "persist-home",
+  "version": "1.0.0",
+  "name": "Persist Home",
+  "description": "Configure persistent home mount wiring for managed WSL state.",
+  "documentationURL": "https://github.com/wsl-images/devcontainer-features/tree/main/src/persist-home",
+  "licenseURL": "https://github.com/wsl-images/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "mountPoint": {
+      "type": "string",
+      "default": "/home",
+      "description": "Mount point path to bind state storage to."
+    },
+    "stateSource": {
+      "type": "string",
+      "default": "/mnt/wsl/wslb-state",
+      "description": "Source path for persistent state."
+    },
+    "systemd": {
+      "type": "boolean",
+      "default": true,
+      "description": "Create and enable a systemd oneshot unit."
+    }
+  }
+}

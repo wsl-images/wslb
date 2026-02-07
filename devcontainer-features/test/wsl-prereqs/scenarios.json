@@ -1,0 +1,8 @@
+{
+  "default": {
+    "image": "ubuntu:24.04",
+    "features": {
+      "wsl-prereqs": {}
+    }
+  }
+}

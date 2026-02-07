@@ -3,6 +3,7 @@
   "name": "WSLB Ubuntu Pro",
   "image": "ubuntu:24.04",
   "features": {
+    "wslb:feature/wsl-prereqs": {},
     "ghcr.io/devcontainers/features/common-utils:2": {
       "upgradePackages": "false",
       "installZsh": "true"
@@ -23,6 +24,11 @@
   "wslb": {
     "distroName": "UbuntuPro",
     "managed": true,
+    "oobe": {
+      "mode": "predefined",
+      "strategy": "hybrid",
+      "promptForPassword": true
+    },
     "state": {
       "mode": "windows-dir"
     },
@@ -41,9 +47,6 @@
       }
     },
     "distribution": {
-      "oobe": {
-        "command": "usermod --shell /bin/bash dev"
-      },
       "shortcut": {
         "enabled": true,
         "icon": {

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WSLB Store</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>WSLB Store</h1>
+          <p>Distro and Dev Container manager for WSL</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="btnDoctor" class="btn subtle">Run Doctor</button>
+        <button id="btnCreateProfile" class="btn">New Profile</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div class="panel-title">Profiles</div>
+        <input id="profileFilter" class="input" placeholder="Filter profiles..." />
+        <div id="profileList" class="profile-list"></div>
+        <div class="panel-title panel-space">Defaults</div>
+        <div class="defaults-grid">
+          <label>Base image<input id="defBaseImage" class="input" /></label>
+          <label>Remote user<input id="defRemoteUser" class="input" /></label>
+          <label>State mode<select id="defStateMode" class="input"><option value="windows-dir">windows-dir</option><option value="vhdx">vhdx</option></select></label>
+          <label>Managed<select id="defManaged" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+          <label>Systemd<select id="defSystemd" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+          <label>Icon slug<input id="defIconSimple" class="input" /></label>
+          <label>Icon color<input id="defIconColor" class="input" /></label>
+          <label>Icon color picker<input id="defIconColorPicker" class="input" type="color" value="#e95420" /></label>
+          <label>Icon style<select id="defIconStyle" class="input"><option value="flat">flat</option><option value="badge">badge</option></select></label>
+          <label>Terminal theme<select id="defTerminalTheme" class="input">
+            <option value="Campbell">Campbell</option>
+            <option value="Campbell Powershell">Campbell Powershell</option>
+            <option value="One Half Dark">One Half Dark</option>
+            <option value="One Half Light">One Half Light</option>
+            <option value="Solarized Dark">Solarized Dark</option>
+            <option value="Solarized Light">Solarized Light</option>
+            <option value="Tango Dark">Tango Dark</option>
+            <option value="Tango Light">Tango Light</option>
+            <option value="Vintage">Vintage</option>
+          </select></label>
+          <label>Terminal font<input id="defTerminalFont" class="input" /></label>
+          <label>Terminal opacity (30-100)<input id="defTerminalOpacity" class="input" type="number" min="30" max="100" step="1" /></label>
+          <label>Terminal acrylic<select id="defTerminalUseAcrylic" class="input"><option value="false">false</option><option value="true">true</option></select></label>
+          <label>Terminal cursor<select id="defTerminalCursorShape" class="input">
+            <option value="bar">bar</option>
+            <option value="vintage">vintage</option>
+            <option value="underscore">underscore</option>
+            <option value="filledBox">filledBox</option>
+            <option value="emptyBox">emptyBox</option>
+            <option value="doubleUnderscore">doubleUnderscore</option>
+          </select></label>
+        </div>
+        <button id="btnSaveDefaults" class="btn subtle">Save Defaults</button>
+      </aside>
+
+      <section class="content">
+        <div class="card">
+          <div class="card-header">
+            <h2>Profile Editor</h2>
+            <div class="actions-inline">
+              <button id="btnDeleteProfile" class="btn danger">Delete</button>
+              <button id="btnSaveProfile" class="btn">Save Profile</button>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label>Profile name<input id="profileName" class="input" /></label>
+            <label>Manifest path<input id="profileManifestPath" class="input mono" /></label>
+            <label>Top-level name<input id="manifestName" class="input" /></label>
+            <label>Base image<input id="manifestImage" class="input" /></label>
+            <label>Remote user<input id="manifestRemoteUser" class="input" /></label>
+            <label>WSLB id<input id="manifestImageId" class="input" /></label>
+            <label>Distro name<input id="manifestDistroName" class="input" /></label>
+            <label>State mode<select id="manifestStateMode" class="input"><option value="windows-dir">windows-dir</option><option value="vhdx">vhdx</option></select></label>
+            <label>Managed<select id="manifestManaged" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Systemd<select id="manifestSystemd" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Icon simpleIcon<input id="manifestIconSimple" class="input" /></label>
+            <label>Icon color<input id="manifestIconColor" class="input" /></label>
+            <label>Icon color picker<input id="manifestIconColorPicker" class="input" type="color" value="#e95420" /></label>
+            <label>Icon style<select id="manifestIconStyle" class="input"><option value="flat">flat</option><option value="badge">badge</option></select></label>
+            <label>Terminal theme<select id="manifestTerminalTheme" class="input">
+              <option value="Campbell">Campbell</option>
+              <option value="Campbell Powershell">Campbell Powershell</option>
+              <option value="One Half Dark">One Half Dark</option>
+              <option value="One Half Light">One Half Light</option>
+              <option value="Solarized Dark">Solarized Dark</option>
+              <option value="Solarized Light">Solarized Light</option>
+              <option value="Tango Dark">Tango Dark</option>
+              <option value="Tango Light">Tango Light</option>
+              <option value="Vintage">Vintage</option>
+            </select></label>
+            <label>Terminal font<input id="manifestTerminalFont" class="input" /></label>
+            <label>Terminal opacity (30-100)<input id="manifestTerminalOpacity" class="input" type="number" min="30" max="100" step="1" /></label>
+            <label>Terminal acrylic<select id="manifestTerminalUseAcrylic" class="input"><option value="false">false</option><option value="true">true</option></select></label>
+            <label>Terminal cursor<select id="manifestTerminalCursorShape" class="input">
+              <option value="bar">bar</option>
+              <option value="vintage">vintage</option>
+              <option value="underscore">underscore</option>
+              <option value="filledBox">filledBox</option>
+              <option value="emptyBox">emptyBox</option>
+              <option value="doubleUnderscore">doubleUnderscore</option>
+            </select></label>
+          </div>
+          <div class="hint">This editor writes a devcontainer superset file compatible with `wslb workspace/wsl` commands.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Simple Icons Picker</h2>
+            <div class="actions-inline">
+              <input id="iconSearch" class="input" placeholder="Search simpleicons slugs..." />
+              <button id="btnIconRefresh" class="btn subtle">Refresh</button>
+            </div>
+          </div>
+          <div id="iconPreview" class="icon-preview"></div>
+          <div id="iconSearchResults" class="icon-results"></div>
+        </div>
+
+        <div class="split">
+          <div class="card">
+            <div class="card-header">
+              <h2>Features</h2>
+              <div class="actions-inline">
+                <input id="featureSearch" class="input" placeholder="Search containers.dev/features" />
+                <button id="btnFeatureRefresh" class="btn subtle">Refresh</button>
+              </div>
+            </div>
+            <div id="featureSearchResults" class="feature-results"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Selected Features</h2>
+            </div>
+            <div id="selectedFeatures" class="selected-features"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Actions</h2>
+            <div class="actions-inline">
+              <button id="btnApplyManifest" class="btn subtle">Write Manifest</button>
+            </div>
+          </div>
+          <div class="action-grid">
+            <button data-action="validate" class="btn action">Validate</button>
+            <button data-action="plan" class="btn action">Plan</button>
+            <button data-action="state-create" class="btn action">State Create</button>
+            <button data-action="install" class="btn action">Install</button>
+            <button data-action="status" class="btn action">Status</button>
+            <button data-action="upgrade" class="btn action">Upgrade</button>
+            <button data-action="rollback" class="btn action">Rollback</button>
+            <button data-action="build" class="btn action">Build</button>
+          </div>
+          <div class="advanced-row">
+            <label>Rollback target (`--to`)<input id="rollbackTarget" class="input mono" placeholder="optional backup path or version id" /></label>
+            <label>Engine<select id="engine" class="input"><option value="">auto</option><option value="docker">docker</option><option value="podman">podman</option></select></label>
+            <label>Non-interactive<select id="nonInteractive" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+            <label>Fallback windows-dir<select id="fallbackWindowsDir" class="input"><option value="false">false</option><option value="true">true</option></select></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Command Output</h2>
+          </div>
+          <pre id="console" class="console"></pre>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

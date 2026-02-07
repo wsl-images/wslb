@@ -3,12 +3,18 @@
   "name": "WSLB Minimal",
   "image": "ubuntu:24.04",
   "features": {
+    "wslb:feature/wsl-prereqs": {},
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },
   "remoteUser": "dev",
   "wslb": {
     "distroName": "UbuntuMinimal",
     "managed": false,
+    "oobe": {
+      "mode": "predefined",
+      "strategy": "wslb-only",
+      "promptForPassword": false
+    },
     "wslconf": {
       "boot": {
         "systemd": true

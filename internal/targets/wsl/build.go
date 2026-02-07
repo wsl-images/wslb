@@ -47,10 +47,22 @@ func BuildArtifact(ctx context.Context, manifestPath string, image workspace.Ima
 		if err != nil {
 			return nil, err
 		}
-		if distAssets.Conf != "" || len(distAssets.IconBytes) > 0 {
+		if distAssets.Conf != "" || len(distAssets.IconBytes) > 0 || strings.TrimSpace(distAssets.OOBEScript) != "" {
 			distDir := filepath.Join(tmpDir, "wsl-distribution")
 			if err := os.MkdirAll(distDir, 0o755); err != nil {
 				return nil, err
+			}
+			if distAssets.BackupNativeConf {
+				df.WriteString("RUN if [ -f /etc/wsl-distribution.conf ]; then cp /etc/wsl-distribution.conf /etc/wsl-distribution.conf.wslb-native; fi\n")
+			}
+			if strings.TrimSpace(distAssets.OOBEScript) != "" && strings.TrimSpace(distAssets.OOBEScriptPath) != "" {
+				oobePath := filepath.Join(distDir, "wslb-oobe.sh")
+				if err := os.WriteFile(oobePath, []byte(distAssets.OOBEScript), 0o755); err != nil {
+					return nil, err
+				}
+				df.WriteString("RUN mkdir -p " + filepath.ToSlash(filepath.Dir(distAssets.OOBEScriptPath)) + "\n")
+				df.WriteString("COPY wsl-distribution/wslb-oobe.sh " + distAssets.OOBEScriptPath + "\n")
+				df.WriteString("RUN chmod +x " + distAssets.OOBEScriptPath + "\n")
 			}
 			if distAssets.Conf != "" {
 				confPath := filepath.Join(distDir, "wsl-distribution.conf")

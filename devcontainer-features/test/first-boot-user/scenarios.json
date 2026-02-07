@@ -1,0 +1,13 @@
+{
+  "default": {
+    "image": "ubuntu:24.04",
+    "features": {
+      "first-boot-user": {
+        "username": "ubuntu",
+        "userUid": "1000",
+        "userGid": "1000",
+        "home": "/home/ubuntu"
+      }
+    }
+  }
+}

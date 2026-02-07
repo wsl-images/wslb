@@ -36,6 +36,7 @@ import (
 const (
 	defaultIconInstallPath  = "/usr/lib/wsl/icons/wslb-icon.ico"
 	defaultWTProfilePath    = "/usr/share/wsl/terminal-profile.json"
+	defaultOOBEScriptPath   = "/usr/lib/wsl/wslb-oobe"
 	simpleIconSVGURLPattern = "https://simpleicons.org/icons/%s.svg"
 )
 
@@ -46,6 +47,11 @@ func renderDistributionConf(ctx context.Context, manifestPath string, image work
 	assets, err := resolveDistributionAssets(ctx, manifestPath, image)
 	if err != nil {
 		return "", err
+	}
+	if strings.TrimSpace(assets.OOBEScript) != "" && strings.TrimSpace(assets.OOBEScriptPath) != "" {
+		if err := writeTextFileToDistro(ctx, distro, assets.OOBEScriptPath, assets.OOBEScript, 0o755); err != nil {
+			return "", err
+		}
 	}
 	if len(assets.IconBytes) > 0 {
 		if err := writeBinaryFileToDistro(ctx, distro, assets.IconPath, assets.IconBytes, 0o644); err != nil {
@@ -66,14 +72,21 @@ type distributionAssets struct {
 	IconBytes             []byte
 	WTProfileTemplatePath string
 	WTProfileTemplateJSON string
+	OOBEScriptPath        string
+	OOBEScript            string
+	BackupNativeConf      bool
 }
 
 func resolveDistributionAssets(ctx context.Context, manifestPath string, image workspace.Image) (distributionAssets, error) {
-	if image.WSL == nil || image.WSL.Distribution == nil {
+	if image.WSL == nil {
 		return distributionAssets{}, nil
 	}
 
 	dist := image.WSL.Distribution
+	if dist == nil {
+		dist = &workspace.WSLDistributionConfig{}
+	}
+
 	iconPath := ""
 	iconBytes := []byte{}
 	if dist.Shortcut != nil {
@@ -85,17 +98,55 @@ func resolveDistributionAssets(ctx context.Context, manifestPath string, image w
 		iconBytes = bytes
 	}
 
-	var b strings.Builder
-	if dist.OOBE != nil && (strings.TrimSpace(dist.OOBE.Command) != "" || strings.TrimSpace(dist.OOBE.DefaultName) != "" || dist.OOBE.DefaultUID != nil) {
-		b.WriteString("[oobe]\n")
+	oobeCfg := workspace.NormalizeOOBEConfig(image.WSL.OOBE)
+	effectiveMode := workspace.EffectiveOOBEMode(image.WSL)
+	oobeDefaultUID := image.WSL.DefaultUser.UID
+	if oobeDefaultUID <= 0 {
+		oobeDefaultUID = 1000
+	}
+	oobeDefaultName := ""
+	if effectiveMode == workspace.OOBEModePredefined {
+		oobeDefaultName = strings.TrimSpace(image.WSL.DefaultUser.Name)
+	}
+	if dist.OOBE != nil {
 		if strings.TrimSpace(dist.OOBE.DefaultName) != "" {
-			b.WriteString("defaultName=" + strings.TrimSpace(dist.OOBE.DefaultName) + "\n")
+			oobeDefaultName = strings.TrimSpace(dist.OOBE.DefaultName)
 		}
-		if dist.OOBE.DefaultUID != nil {
-			b.WriteString(fmt.Sprintf("defaultUid=%d\n", *dist.OOBE.DefaultUID))
+		if dist.OOBE.DefaultUID != nil && *dist.OOBE.DefaultUID > 0 {
+			oobeDefaultUID = *dist.OOBE.DefaultUID
 		}
-		if strings.TrimSpace(dist.OOBE.Command) != "" {
-			b.WriteString("command=" + strings.TrimSpace(dist.OOBE.Command) + "\n")
+	}
+	oobeCommand := ""
+	oobeScriptPath := ""
+	oobeScript := ""
+	backupNativeConf := false
+	if dist.OOBE != nil && strings.TrimSpace(dist.OOBE.Command) != "" {
+		oobeCommand = strings.TrimSpace(dist.OOBE.Command)
+	} else {
+		strategy := strings.ToLower(strings.TrimSpace(oobeCfg.Strategy))
+		if strategy != workspace.OOBEStrategyNative {
+			promptPassword := true
+			if oobeCfg.PromptForPassword != nil {
+				promptPassword = *oobeCfg.PromptForPassword
+			}
+			oobeScriptPath = defaultOOBEScriptPath
+			oobeCommand = oobeScriptPath
+			oobeScript = renderWSLBOOBEScript(image.WSL, effectiveMode, strategy, promptPassword, oobeDefaultName, oobeDefaultUID)
+			backupNativeConf = strategy == workspace.OOBEStrategyHybrid
+		}
+	}
+
+	var b strings.Builder
+	if strings.TrimSpace(oobeCommand) != "" || strings.TrimSpace(oobeDefaultName) != "" || oobeDefaultUID > 0 {
+		b.WriteString("[oobe]\n")
+		if strings.TrimSpace(oobeDefaultName) != "" {
+			b.WriteString("defaultName=" + strings.TrimSpace(oobeDefaultName) + "\n")
+		}
+		if oobeDefaultUID > 0 {
+			b.WriteString(fmt.Sprintf("defaultUid=%d\n", oobeDefaultUID))
+		}
+		if strings.TrimSpace(oobeCommand) != "" {
+			b.WriteString("command=" + strings.TrimSpace(oobeCommand) + "\n")
 		}
 	}
 	if dist.Shortcut != nil {
@@ -150,13 +201,294 @@ func resolveDistributionAssets(ctx context.Context, manifestPath string, image w
 			b.WriteString("ProfileTemplate=" + wtTemplatePath + "\n")
 		}
 	}
+	if len(dist.ExtraSections) > 0 {
+		sectionNames := make([]string, 0, len(dist.ExtraSections))
+		for section := range dist.ExtraSections {
+			sectionNames = append(sectionNames, section)
+		}
+		sort.Strings(sectionNames)
+		for _, section := range sectionNames {
+			kv := dist.ExtraSections[section]
+			if len(kv) == 0 {
+				continue
+			}
+			b.WriteString("[" + section + "]\n")
+			keys := make([]string, 0, len(kv))
+			for k := range kv {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				val, err := renderDistributionScalarValue(kv[key])
+				if err != nil {
+					continue
+				}
+				b.WriteString(key + "=" + val + "\n")
+			}
+		}
+	}
 	return distributionAssets{
 		Conf:                  b.String(),
 		IconPath:              iconPath,
 		IconBytes:             iconBytes,
 		WTProfileTemplatePath: wtTemplatePath,
 		WTProfileTemplateJSON: wtTemplate,
+		OOBEScriptPath:        oobeScriptPath,
+		OOBEScript:            oobeScript,
+		BackupNativeConf:      backupNativeConf,
 	}, nil
+}
+
+func renderDistributionScalarValue(v interface{}) (string, error) {
+	switch t := v.(type) {
+	case bool:
+		return boolToString(t), nil
+	case string:
+		return t, nil
+	case float64:
+		return fmt.Sprintf("%v", t), nil
+	case float32:
+		return fmt.Sprintf("%v", t), nil
+	case int:
+		return fmt.Sprintf("%d", t), nil
+	case int64:
+		return fmt.Sprintf("%d", t), nil
+	case int32:
+		return fmt.Sprintf("%d", t), nil
+	case uint:
+		return fmt.Sprintf("%d", t), nil
+	case uint64:
+		return fmt.Sprintf("%d", t), nil
+	case uint32:
+		return fmt.Sprintf("%d", t), nil
+	default:
+		return "", fmt.Errorf("unsupported value type %T", v)
+	}
+}
+
+func renderWSLBOOBEScript(cfg *workspace.WSLImageConfig, mode, strategy string, promptPassword bool, defaultName string, defaultUID int) string {
+	if cfg == nil {
+		return ""
+	}
+	userName := strings.TrimSpace(defaultName)
+	if userName == "" {
+		userName = strings.TrimSpace(cfg.DefaultUser.Name)
+	}
+	uid := defaultUID
+	if uid <= 0 {
+		uid = cfg.DefaultUser.UID
+	}
+	if uid <= 0 {
+		uid = 1000
+	}
+	gid := cfg.DefaultUser.GID
+	if gid <= 0 {
+		gid = uid
+	}
+	if mode == "" {
+		mode = workspace.OOBEModeAuto
+	}
+	if strategy == "" {
+		strategy = workspace.OOBEStrategyHybrid
+	}
+	prompt := "false"
+	if promptPassword {
+		prompt = "true"
+	}
+return fmt.Sprintf(`#!/bin/sh
+set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+export PATH
+
+WSLB_MODE=%q
+WSLB_STRATEGY=%q
+WSLB_PROMPT_PASSWORD=%q
+WSLB_DEFAULT_USER=%q
+WSLB_DEFAULT_UID=%d
+WSLB_DEFAULT_GID=%d
+WSLB_SCRIPT_PATH=%q
+
+ensure_wslconf_default() {
+  user="$1"
+  [ -n "$user" ] || return 0
+  mkdir -p /etc
+  touch /etc/wsl.conf
+  if grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
+    if grep -q '^default=' /etc/wsl.conf 2>/dev/null; then
+      sed -i "s/^default=.*/default=${user}/" /etc/wsl.conf || true
+    else
+      printf '\ndefault=%%s\n' "$user" >> /etc/wsl.conf
+    fi
+  else
+    printf '\n[user]\ndefault=%%s\n' "$user" >> /etc/wsl.conf
+  fi
+}
+
+have_getent() {
+  command -v getent >/dev/null 2>&1
+}
+
+get_passwd_entry() {
+  key="$1"
+  if have_getent; then
+    getent passwd "$key" 2>/dev/null || true
+    return 0
+  fi
+  if [ ! -f /etc/passwd ]; then
+    return 0
+  fi
+  if echo "$key" | grep -Eq '^[0-9]+$'; then
+    awk -F: -v k="$key" '$3==k { print; exit }' /etc/passwd || true
+  else
+    awk -F: -v k="$key" '$1==k { print; exit }' /etc/passwd || true
+  fi
+}
+
+get_group_entry() {
+  key="$1"
+  if have_getent; then
+    getent group "$key" 2>/dev/null || true
+    return 0
+  fi
+  if [ ! -f /etc/group ]; then
+    return 0
+  fi
+  if echo "$key" | grep -Eq '^[0-9]+$'; then
+    awk -F: -v k="$key" '$3==k { print; exit }' /etc/group || true
+  else
+    awk -F: -v k="$key" '$1==k { print; exit }' /etc/group || true
+  fi
+}
+
+existing_user_uid_1000() {
+  entry="$(get_passwd_entry "$WSLB_DEFAULT_UID")"
+  [ -n "$entry" ] || return 1
+  echo "$entry" | cut -d: -f1
+}
+
+create_group_if_needed() {
+  user="$1"
+  if [ -n "$(get_group_entry "$WSLB_DEFAULT_GID")" ]; then
+    return 0
+  fi
+  if command -v groupadd >/dev/null 2>&1; then
+    groupadd -g "$WSLB_DEFAULT_GID" "$user" || true
+  elif command -v addgroup >/dev/null 2>&1; then
+    addgroup --gid "$WSLB_DEFAULT_GID" "$user" >/dev/null 2>&1 || addgroup -g "$WSLB_DEFAULT_GID" "$user" >/dev/null 2>&1 || true
+  fi
+}
+
+detect_default_groups() {
+  groups=""
+  for g in sudo wheel adm cdrom dip plugdev audio video netdev docker; do
+    if [ -n "$(get_group_entry "$g")" ]; then
+      groups="${groups:+$groups,}$g"
+    fi
+  done
+  echo "$groups"
+}
+
+create_user() {
+  user="$1"
+  groups="$(detect_default_groups)"
+  create_group_if_needed "$user"
+
+  if command -v useradd >/dev/null 2>&1; then
+    if [ -n "$groups" ]; then
+      useradd -m -u "$WSLB_DEFAULT_UID" -g "$WSLB_DEFAULT_GID" -G "$groups" -s /bin/bash "$user"
+    else
+      useradd -m -u "$WSLB_DEFAULT_UID" -g "$WSLB_DEFAULT_GID" -s /bin/bash "$user"
+    fi
+    return 0
+  fi
+
+  if command -v adduser >/dev/null 2>&1; then
+    if adduser --help 2>&1 | grep -q -- '--uid'; then
+      adduser --uid "$WSLB_DEFAULT_UID" --gid "$WSLB_DEFAULT_GID" --gecos '' "$user"
+    elif adduser --help 2>&1 | grep -q -- '\-D'; then
+      adduser -D -u "$WSLB_DEFAULT_UID" -G "$user" "$user" || adduser -D "$user"
+    else
+      adduser "$user" || true
+    fi
+    if [ -n "$groups" ] && command -v usermod >/dev/null 2>&1; then
+      usermod -aG "$groups" "$user" || true
+    fi
+    id -u "$user" >/dev/null 2>&1 && return 0
+  fi
+
+  echo "no supported user creation utility found (useradd/adduser)" >&2
+  return 40
+}
+
+run_native_oobe_if_configured() {
+  if [ "$WSLB_STRATEGY" = "wslb-only" ]; then
+    return 0
+  fi
+  native_conf="/etc/wsl-distribution.conf.wslb-native"
+  [ -f "$native_conf" ] || return 0
+  native_cmd="$(awk '
+    BEGIN { in_oobe=0 }
+    /^\[/ {
+      line=tolower($0)
+      in_oobe=(line=="[oobe]")
+      next
+    }
+    in_oobe {
+      if (tolower($0) ~ /^command[[:space:]]*=/) {
+        sub(/^[^=]*=/, "", $0)
+        print $0
+        exit
+      }
+    }
+  ' "$native_conf" | tr -d '\r')"
+  [ -n "$native_cmd" ] || return 0
+  if [ "$native_cmd" = "$WSLB_SCRIPT_PATH" ]; then
+    return 0
+  fi
+  sh -lc "$native_cmd"
+}
+
+if [ "$WSLB_STRATEGY" = "native-only" ]; then
+  run_native_oobe_if_configured
+  exit 0
+fi
+
+run_native_oobe_if_configured || true
+
+existing_user="$(existing_user_uid_1000 || true)"
+if [ -n "$existing_user" ]; then
+  ensure_wslconf_default "$existing_user"
+  exit 0
+fi
+
+target_user=""
+if [ "$WSLB_MODE" = "interactive" ]; then
+  while true; do
+    printf 'Enter new UNIX username: '
+    read -r target_user || true
+    if [ -n "$target_user" ]; then
+      break
+    fi
+  done
+else
+  target_user="$WSLB_DEFAULT_USER"
+fi
+
+if [ -z "$target_user" ]; then
+  echo "no username provided for OOBE" >&2
+  exit 41
+fi
+
+if ! id -u "$target_user" >/dev/null 2>&1; then
+  create_user "$target_user"
+fi
+
+if [ "$WSLB_PROMPT_PASSWORD" = "true" ]; then
+  passwd "$target_user" || true
+fi
+
+ensure_wslconf_default "$target_user"
+`, mode, strategy, prompt, userName, uid, gid, defaultOOBEScriptPath)
 }
 
 func resolveWTTemplate(manifestPath string, raw json.RawMessage) (string, error) {

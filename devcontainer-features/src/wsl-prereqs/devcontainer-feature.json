@@ -1,0 +1,28 @@
+{
+  "id": "wsl-prereqs",
+  "version": "1.0.0",
+  "name": "WSL Prerequisites",
+  "description": "Install user-management prerequisites across common Linux distros for WSL first-launch setup.",
+  "documentationURL": "https://github.com/wsl-images/devcontainer-features/tree/main/src/wsl-prereqs",
+  "licenseURL": "https://github.com/wsl-images/devcontainer-features/blob/main/LICENSE",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "options": {
+    "installSudo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install sudo when package manager supports it."
+    },
+    "installBash": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install bash when package manager supports it."
+    },
+    "installCaCerts": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install ca-certificates when package manager supports it."
+    }
+  }
+}

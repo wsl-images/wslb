@@ -242,6 +242,35 @@ func TestResolveDistributionAssetsWindowsterminalTemplatePath(t *testing.T) {
 	}
 }
 
+func TestResolveDistributionAssetsPassThroughSections(t *testing.T) {
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			Distribution: &workspace.WSLDistributionConfig{
+				ExtraSections: map[string]map[string]interface{}{
+					"custom": {
+						"enabled": true,
+						"level":   2,
+					},
+				},
+			},
+		},
+	}
+	assets, err := resolveDistributionAssets(context.Background(), "C:\\repo\\devcontainer.json", image)
+	if err != nil {
+		t.Fatalf("resolveDistributionAssets() error = %v", err)
+	}
+	required := []string{
+		"[custom]",
+		"enabled=true",
+		"level=2",
+	}
+	for _, token := range required {
+		if !strings.Contains(assets.Conf, token) {
+			t.Fatalf("expected %q in conf:\n%s", token, assets.Conf)
+		}
+	}
+}
+
 func containsAll(s string, parts ...string) bool {
 	for _, p := range parts {
 		if !strings.Contains(s, p) {

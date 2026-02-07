@@ -145,6 +145,33 @@ func TestRenderWSLConfAdditionalSections(t *testing.T) {
 	}
 }
 
+func TestRenderWSLConfPassThroughSections(t *testing.T) {
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			WSLConf: workspace.WSLConfConfig{
+				Boot: &workspace.WSLConfBoot{Systemd: boolPtr(true)},
+				ExtraSections: map[string]map[string]interface{}{
+					"custom": {
+						"enabled": true,
+						"name":    "demo",
+					},
+				},
+			},
+		},
+	}
+	conf := renderWSLConf(image)
+	required := []string{
+		"[custom]",
+		"enabled=true",
+		"name=demo",
+	}
+	for _, token := range required {
+		if !strings.Contains(conf, token) {
+			t.Fatalf("renderWSLConf missing %q in:\n%s", token, conf)
+		}
+	}
+}
+
 func TestRenderGlobalWSLConfig(t *testing.T) {
 	cfg := workspace.WSLGlobalConfig{
 		WSL2: map[string]interface{}{
@@ -182,12 +209,32 @@ func TestManagedUserHome(t *testing.T) {
 		{mount: "/home", user: "dev", want: "/home/dev"},
 		{mount: "/workspace/home", user: "alice", want: "/workspace/home/alice"},
 		{mount: "/", user: "dev", want: "/dev"},
-		{mount: "", user: "", want: "/home/dev"},
+		{mount: "", user: "", want: "/home"},
 	}
 	for _, c := range cases {
 		got := managedUserHome(c.mount, c.user)
 		if got != c.want {
 			t.Fatalf("managedUserHome(%q,%q)=%q want=%q", c.mount, c.user, got, c.want)
 		}
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func TestRenderWSLConfInteractiveOOBEDoesNotSetDefaultUser(t *testing.T) {
+	trueVal := true
+	image := workspace.Image{
+		WSL: &workspace.WSLImageConfig{
+			OOBE: &workspace.WSLOOBEConfig{
+				Mode: workspace.OOBEModeInteractive,
+			},
+			WSLConf: workspace.WSLConfConfig{
+				Boot: &workspace.WSLConfBoot{Systemd: &trueVal},
+			},
+		},
+	}
+	conf := renderWSLConf(image)
+	if strings.Contains(conf, "[user]") || strings.Contains(conf, "default=") {
+		t.Fatalf("interactive OOBE should not auto-write [user] default in wsl.conf:\n%s", conf)
 	}
 }

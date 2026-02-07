@@ -1,0 +1,34 @@
+name: Test Features
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "test/**"
+      - ".github/workflows/test.yaml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - wsl-prereqs
+          - first-boot-user
+          - persist-home
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dev Container CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Run Feature Tests
+        run: |
+          devcontainer features test \
+            --project-folder . \
+            --features ${{ matrix.feature }} \
+            --base-image ubuntu:24.04

@@ -18,3 +18,10 @@ node_modules/
 # Local binaries and scratch outputs
 /wslb.exe
 /.wslb-out/
+/.tmp/
+/e2e-report.json
+/wsl-images-oobe-matrix-report.json
+/oobe-matrix-report.json
+/base-image-matrix-report.json
+/.wslb-store/
+/.devcontainer/store-ubuntu.json

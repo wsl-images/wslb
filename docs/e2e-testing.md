@@ -68,3 +68,23 @@ Response:
   "durationMs": 12345
 }
 ```
+
+## 3) WSL Images OOBE Matrix
+
+Run the docker-backed OOBE smoke matrix for the official `wsl-images` distro set:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/oobe-matrix.ps1 -Out .\wsl-images-oobe-matrix-report.json
+```
+
+This executes `TestWSLImagesOOBEMatrix` and writes pass/fail per image to the report JSON.
+
+## 4) Base Distro Matrix (25 Images)
+
+Run the base-image compatibility matrix (Docker official + vendor-maintained distro images):
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/base-image-matrix.ps1 -Out .\base-image-matrix-report.json
+```
+
+This executes `TestBaseImageMatrixWSLPrereqsAndOOBE` and writes pass/fail/skip per base image.
